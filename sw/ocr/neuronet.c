@@ -31,7 +31,7 @@
 void neuronet_init(NeuroNet *nn, int n_layers, int *n_neurons)
 {
     int layer_idx, neuron_idx, sum;
-    float *head[MAX_LAYERS];  // Pointer to the first neuron value of each layer.
+    float *head[MAX_LAYERS]; // Pointer to the first neuron value of each layer.
 
     if (n_layers < 2 || n_layers > MAX_LAYERS)
     {
@@ -47,9 +47,9 @@ void neuronet_init(NeuroNet *nn, int n_layers, int *n_neurons)
         nn->total_neurons += n_neurons[layer_idx];
     }
 
-    nn->neurons = (float *) malloc(sizeof(float *) * nn->total_neurons);
-    nn->forward_weights = (float **) malloc(sizeof(float *) * nn->total_neurons);
-    nn->previous_neurons = (float **) malloc(sizeof(float *) * nn->total_neurons);
+    nn->neurons = (float *)malloc(sizeof(float *) * nn->total_neurons);
+    nn->forward_weights = (float **)malloc(sizeof(float *) * nn->total_neurons);
+    nn->previous_neurons = (float **)malloc(sizeof(float *) * nn->total_neurons);
     nn->total_layers = n_layers;
 
     neuron_idx = 0;
@@ -76,9 +76,9 @@ void neuronet_init(NeuroNet *nn, int n_layers, int *n_neurons)
     for (layer_idx = 1; layer_idx < nn->total_layers; layer_idx++)
     {
         // Accumulating # of weights, including one bias value per neuron.
-        nn->total_weights += (nn->n_neurons[layer_idx-1] + 1)*nn->n_neurons[layer_idx];
+        nn->total_weights += (nn->n_neurons[layer_idx - 1] + 1) * nn->n_neurons[layer_idx];
     }
-    nn->weights = (float *) malloc(sizeof(float) * nn->total_weights);
+    nn->weights = (float *)malloc(sizeof(float) * nn->total_weights);
 
     // Set the starting pointer to the forward weights for each neurons.
     sum = 0, neuron_idx = nn->n_neurons[0];
@@ -87,7 +87,7 @@ void neuronet_init(NeuroNet *nn, int n_layers, int *n_neurons)
         for (int idx = 0; idx < nn->n_neurons[layer_idx]; idx++, neuron_idx++)
         {
             nn->forward_weights[neuron_idx] = &(nn->weights[sum]);
-            sum += (nn->n_neurons[layer_idx-1] + 1); // add one for bias.
+            sum += (nn->n_neurons[layer_idx - 1] + 1); // add one for bias.
         }
     }
 }
@@ -113,10 +113,11 @@ int neuronet_eval(NeuroNet *nn, float *images)
 {
     float inner_product, max;
     float *p_neuron, *p_weight;
+
     int idx, layer_idx, neuron_idx, max_idx;
 
     // Copy the input image array (784 pixels) to the input neurons.
-    memcpy((void *) nn->neurons, (void *) images, nn->n_neurons[0]*sizeof(float));
+    memcpy((void *)nn->neurons, (void *)images, nn->n_neurons[0] * sizeof(float));
 
     // Forward computations
     neuron_idx = nn->n_neurons[0];
@@ -127,14 +128,19 @@ int neuronet_eval(NeuroNet *nn, float *images)
             // 'p_weight' points to the first forward weight of a layer.
             p_weight = nn->forward_weights[neuron_idx];
             inner_product = 0.0;
-
             // Loop over all forward-connected neural links.
             p_neuron = nn->previous_neurons[neuron_idx];
-            for (int jdx = 0; jdx < nn->n_neurons[layer_idx-1]; jdx++)
+            for (int jdx = 0; jdx < nn->n_neurons[layer_idx - 1]; jdx++)
             {
-                inner_product += (*p_neuron++) * (*p_weight++);
+                *((float volatile *)0xC4000000) = (*p_neuron++);
+                *((float volatile *)0xC4100000) = (*p_weight++);
+                *((float volatile *)0xC4200000) = inner_product;
+                inner_product = *((float volatile *)0xC4300000);
+                // inner_product += (*p_neuron++) * (*p_weight++);
             }
-
+            // *p_weight_mmio = *p_weight; // 加上最後一個權重作為偏置
+            // *inner_product_mmio = inner_product;
+            // inner_product = *result_mmio;
             inner_product += *(p_weight); // The last weight of a neuron is the bias.
             nn->neurons[neuron_idx] = relu(inner_product);
         }
@@ -142,7 +148,7 @@ int neuronet_eval(NeuroNet *nn, float *images)
 
     // Return the index to the maximal neuron value of the output layer.
     max = -1.0, max_idx = 0;
-    for (idx = 0; idx < nn->n_neurons[nn->total_layers-1]; idx++)
+    for (idx = 0; idx < nn->n_neurons[nn->total_layers - 1]; idx++)
     {
         if (max < nn->output[idx])
         {
@@ -156,6 +162,5 @@ int neuronet_eval(NeuroNet *nn, float *images)
 
 float relu(float x)
 {
-	return x < 0.0 ? 0.0 : x;
+    return x < 0.0 ? 0.0 : x;
 }
-
