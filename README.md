@@ -1,31 +1,56 @@
-# Handwriting Recognition using Domain-Specific Accelerator
+# **Handwriting Recognition using CNN (Domain-Specific Accelerator)**  
 
-## Project Overview
-This project focuses on implementing a domain-specific accelerator (DSA) to optimize the inner product of  a digit handwriting recognition system using a Multi-Layer Perceptron (MLP). Based on `aquila`, a RISC-V 5 pipelined stage core implemented by Embedded Intelligence System Lab (EISL). The aim is to accelerate the inner product calculations that are integral to the evaluation phase of MLP-based digit recognition. 
+## **Project Overview**  
+This project focuses on implementing a **Domain-Specific Accelerator (DSA)** to accelerate the inner product operations in a **Convolutional Neural Network (CNN)** for handwriting recognition. The design is based on **`aquila`** — a RISC-V 5-stage pipelined core developed by the **Embedded Intelligence System Lab (EISL)**. The primary focus is on optimizing the **convolutional layer** and **fully connected layer** inner product computations to improve CNN performance.  
 
-## Features
-- **MMIO-based interaction**: Utilizes memory-mapped input/output (MMIO) for device communication.
-- **Floating Point IP**: Add fused multiply-add IP in Vivado using non-blocking techniques to enhance performance during inner product calculations.
-- **MLP Optimization**: Focuses on optimizing the evaluation phase of the MLP, particularly the inner product computations crucial for digit recognition.
+---
 
-## Implementation Details
-- **Software**: Modifies the C code to directly assign inner product calculations for MLP layers to MMIO-mapped addresses, avoiding costly function calls like `__mulsf` and `__addsf`.
-- **Hardware**: Implements a data feeder within the `soc_top.v` module that interacts with a floating-point IP to accelerate inner product operations in the MLP.
-- **Non-Blocking Design**: Utilizes a non-blocking mechanism for data processing in MLP evaluations, improving efficiency by reducing stall cycles.
+## **System Architecture**  
+![block diagram](diagram.png)  
 
-## block diagram
-![block diagram](diagram.png)
+---
 
-## Performance
-- Profiling shows significant performance improvements in the MLP's inner product evaluation phase due to the optimized accelerator design.
-- The overhead associated with data input and output is fixed and unaffected by latency due to the consistent number of computations in the MLP.
+## **Current Progress**  
 
-## Results
-This design demonstrates substantial speedup in MLP evaluation, particularly in accelerating inner product calculations critical for digit handwriting recognition.
+1. **MMIO-based Communication**  
+   - Uses **Memory-Mapped I/O (MMIO)** for communication between the CPU and the accelerator, enabling efficient hardware-software co-design.  
 
-## Future Work
-Further improvements could focus on extending the MLP model to handle more complex datasets or investigating more advanced acceleration techniques for deeper networks.
+2. **Floating-Point IP Acceleration**  
+   - Integrated a floating-point IP core in **Vivado**, utilizing a non-blocking approach to accelerate inner product calculations and reduce bottlenecks.  
 
+3. **CNN Optimization**  
+   - **Convolutional Layer Optimization**: Improved the speed of inner product calculations in the `convolutional_layer.h` file, specifically for the **conv3d** function.  
+   - **Fully Connected Layer Optimization**: Enhanced the efficiency of inner product computations in the **fully_connected_layer**.  
+   - **TCM Optimization**: Stored weight arrays in **TCM (Tightly Coupled Memory)** to mitigate cache latency and improve memory access efficiency.  
 
+4. **Current Performance**  
+   - Execution time reduced: **21289 ms → 3582 ms** (5.94x speedup).  
 
+---
 
+## **Recent Work**  
+
+1. **Memory Optimization**  
+   - Store the previous layer's **feature maps** in **TCM** to further reduce cache latency.  
+
+2. **Convolution Layer Circuit Design**  
+   - Further optimize the **conv3d** operation by implementing it directly in hardware to achieve higher computational efficiency.  
+
+3. **Scaling to Complex Models**  
+   - Explore deeper and more complex CNN models, and optimize the accelerator design to support larger-scale convolutional operations.  
+
+---
+
+## **Implementation Details**  
+
+1. **Software**  
+   - Modified the CNN C code to offload inner product computations in the convolutional and fully connected layers to the hardware accelerator via MMIO.  
+   - Replaced software-based floating-point operations with MMIO-mapped hardware computations to improve performance.  
+
+2. **Hardware**  
+   - Implemented the **data_feeder** module in `soc_top.v`, which interacts with the floating-point IP core to manage data transfers for convolutional and fully connected layers.  
+   - Designed a **non-blocking architecture** to allow concurrent data processing and computation, minimizing pipeline stalls.  
+
+3. **Memory Optimization**  
+   - Stored weight arrays in **TCM** (Tightly Coupled Memory) to avoid cache latency and ensure deterministic memory access performance.  
+---

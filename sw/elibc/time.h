@@ -55,8 +55,8 @@
 #define __TIME__H__
 #include <stddef.h>
 
-#define CLOCKS_PER_SEC  1000000      /*         1 MHz */
-#define CPU_FREQ_HZ    41666667      /* 41.666667 MHz */
+#define CLOCKS_PER_SEC  1000000      /*    1 MHz */
+#define CPU_FREQ_HZ    50000000      /* 50.0 MHz */
 
 typedef unsigned long clock_t;
 

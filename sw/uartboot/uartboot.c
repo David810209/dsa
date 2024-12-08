@@ -17,6 +17,10 @@
 //  Oct/15/2022, by Chun-Jen Tsai
 //    Use different schemes for loading into TCM (on-the-fly) and into
 //    DRAM (buffered loasding).
+//
+//  Aug/07/2024, by Chun-Jen Tsai
+//    Fix a bug in zero-initialization of .bss sections.
+//
 // -----------------------------------------------------------------------------
 //  License information:
 //
@@ -76,7 +80,7 @@ int load_elf(Elf32_Ehdr *ehdr);
 uint8_t *prog;
 uint8_t eheader[64], pheader[128];
 char    *organization = "EISL@NYCU, Hsinchu, Taiwan";
-int     year = 2023;
+int     year = 2024;
 
 int main(void)
 {
@@ -129,17 +133,23 @@ int main(void)
     return 0;
 }
 
+#define N_ZERO_SECS 8
+
 int load_elf(Elf32_Ehdr *ehdr)
 {
     Elf32_Phdr *section;
     uint32_t skip, current_byte;
-    uint32_t *mem;
     uint8_t  *dst_addr;
     int idx, jdx;
+
+    // The info of sections to be initialized to zeros.
+    uint32_t *zmem[N_ZERO_SECS];  // Addresses of the sections.
+    int zsize[N_ZERO_SECS], zidx; // Sizes of the sectinos.
 
     current_byte = sizeof(Elf32_Ehdr) + ehdr->e_phentsize*ehdr->e_phnum;
 
     // Load all loadable sections of an ELF image to the destination.
+    zidx = 0;
     section = (Elf32_Phdr *) pheader;
     for (idx = 0; idx < ehdr->e_phnum; idx++)
     {
@@ -155,15 +165,19 @@ int load_elf(Elf32_Ehdr *ehdr)
                 dst_addr[jdx] = inbyte();
                 current_byte++;
             }
-            mem = (uint32_t *) &(dst_addr[jdx]);
-            while (jdx < section[idx].p_memsz)
-            {
-                mem[(jdx>>2)] = 0;
-                jdx += sizeof(int);
-            }
+
+            // Record the memory areas that need to be zero-initialized.
+            zmem[zidx] = (uint32_t *) &(dst_addr[jdx]);
+            zsize[zidx] = (section[idx].p_memsz - jdx)/sizeof(int);
+            if (++zidx >= N_ZERO_SECS) break;
         }
     }
 
+    // Set the uninitialized memory areas to all zeros.
+    for (idx = 0; idx < zidx; idx++)
+    {
+        for (jdx = 0; jdx < zsize[idx]; jdx++) zmem[idx][jdx] = 0;
+    }
     return 0;
 }
 

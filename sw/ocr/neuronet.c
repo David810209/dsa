@@ -132,12 +132,11 @@ int neuronet_eval(NeuroNet *nn, float *images)
             p_neuron = nn->previous_neurons[neuron_idx];
             for (int jdx = 0; jdx < nn->n_neurons[layer_idx - 1]; jdx++)
             {
-                *((float volatile *)0xC4000000) = (*p_neuron++);
-                *((float volatile *)0xC4100000) = (*p_weight++);
-                *((float volatile *)0xC4200000) = inner_product;
-                inner_product = *((float volatile *)0xC4300000);
+                *((float volatile *)0xC4100000) = (*p_neuron++);
+                *((float volatile *)0xC4200000) = (*p_weight++);
                 // inner_product += (*p_neuron++) * (*p_weight++);
             }
+            inner_product = *((float volatile *)0xC4300000);
             // *p_weight_mmio = *p_weight; // 加上最後一個權重作為偏置
             // *inner_product_mmio = inner_product;
             // inner_product = *result_mmio;
