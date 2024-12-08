@@ -85,6 +85,8 @@ void average_pooling_layer_forward_propagation(struct list_node *ptr, input_stru
         printf("Error input size not match %lu/%lu\n", input->in_size_, entry->base.in_size_);
         exit(-1);
     }
+    // printf("input->in_ptr_ address = %x\n", input->in_ptr_);
+    // printf("entry->base.a_ptr_ address = %x\n", entry->base.a_ptr_);
     float_t *in = input->in_ptr_;
     float_t *a = entry->base.a_ptr_;
     float_t *out = entry->base.out_ptr_;
@@ -150,7 +152,8 @@ layer_base * new_average_pooling_layer(
                pool_out_dim(in_width, pooling_size, stride) * pool_out_dim(in_height, pooling_size, stride) * in_channels, 
                0,
                0,
-               activate==relu);
+               activate==relu,
+               0 /*last layer*/);
 #ifdef PRINT_LAYER
     static uint64_t call_time = 0;
     sprintf(ret->base.layer_name_, "avg_pool%lu", call_time++);

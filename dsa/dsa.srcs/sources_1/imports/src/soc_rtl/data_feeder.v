@@ -102,8 +102,9 @@ begin
             send <= 1;
     end
 end
-assign ready_o = S == S_IDLE;
+//assign ready_o = S == S_IDLE;
 
+assign ready_o = 1;
 
 floating_point_0 floating_point_0(
     .aclk(clk_i),

@@ -132,7 +132,8 @@ layer_base * new_fully_connected_layer(
                out_dim,
                in_dim * out_dim,
                has_bias ? out_dim : 0,
-               activate==relu);
+               activate==relu,
+               0 /*last layer*/);
 #ifdef PRINT_LAYER
     static uint64_t call_time = 0;
     sprintf(ret->base.layer_name_, "fc%lu", call_time++);

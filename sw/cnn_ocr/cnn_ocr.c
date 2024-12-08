@@ -97,6 +97,7 @@ int main()
     tick = clock();
     for (int idx = 0; idx < n_images; idx++)
     {
+        // printf("Testing image %d ...\n\n", idx);
         class_id = cnn_evaluate(nn, images[idx], image_size);
         if ((int) labels[idx] == class_id) ++correct_count;
     }
@@ -110,7 +111,7 @@ int main()
     for (int idx = 0; idx < n_images; idx++) free(images[idx]);
     free(images);
     free(labels);
-    free(weights);
+    tcm_free(weights);
 
     return 0;
 }

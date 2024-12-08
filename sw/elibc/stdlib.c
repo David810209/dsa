@@ -61,6 +61,83 @@
 
 typedef unsigned long ulong;
 
+// TCM heap manage part
+extern ulong __tcm_heap_start; /* declared in the linker script */
+extern ulong __tcm_heap_size;  /* declared in the linker script */
+static ulong tcm_heap_top = (ulong) &__tcm_heap_start;
+static ulong tcm_heap_size = (ulong) &__tcm_heap_size;
+static ulong *tcm_curr_top = (ulong *) 0xFFFFFFF0, *tcm_heap_end = (ulong *) 0xFFFFFFF0;
+
+void *tcm_malloc(size_t n){
+    void *return_ptr;
+    ulong *ptr, temp;
+    int r;
+
+    if (tcm_curr_top == tcm_heap_end) // first time to call tcm_malloc()?
+    {
+        tcm_curr_top = (ulong *) tcm_heap_top;
+        tcm_heap_end = (ulong *) ((tcm_heap_top + tcm_heap_size) & 0xFFFFFFF0);
+        *tcm_curr_top = (ulong) tcm_heap_end;
+    }
+
+    // Search for a large-enough free memory block (FMB).
+    return_ptr = NULL;
+    for (ptr = tcm_curr_top; ptr < tcm_heap_end; ptr = (ulong *) (*ptr & 0xFFFFFFFE))
+    {
+        if ((*ptr & 1) == 0 && (*ptr - (ulong) ptr > n))
+        {
+            temp = ((ulong) ptr) & 0xFFFFFFFE;
+            return_ptr = (void *) (temp + sizeof(ulong));
+
+            // Update the FMB link list structure.
+            r = n % sizeof(ulong);
+            temp = n + sizeof(ulong) + ((r)? 4-r : 0);
+            tcm_curr_top = ptr + temp/sizeof(ulong);
+            if (tcm_curr_top != (ulong *) *ptr)
+                *tcm_curr_top = *ptr;
+            *ptr = (ulong) tcm_curr_top | 1;
+            break;
+        }
+    }
+
+    if (return_ptr != NULL) return return_ptr;
+
+    // Search again for a FMB from tcm_heap_top to tcm_curr_top
+    for (ptr = (ulong *) tcm_heap_top; ptr < tcm_curr_top; ptr = (ulong *) (*ptr & 0xFFFFFFFE))
+    {
+        if ((*ptr & 1) == 0 && (*ptr - (ulong) ptr > n))
+        {
+            temp = ((ulong) ptr) & 0xFFFFFFFE;
+            return_ptr = (void *) (temp + sizeof(ulong));
+
+            // Update the FMB link list structure.
+            r = n % sizeof(ulong);
+            temp = n + sizeof(ulong) + ((r)? 4-r : 0);
+            tcm_curr_top = ptr + temp/sizeof(ulong);
+            if (tcm_curr_top != (ulong *) *ptr)
+                *tcm_curr_top = *ptr;
+            *ptr = (ulong) tcm_curr_top | 1;
+            break;
+        }
+    }
+    return return_ptr;
+}
+
+void tcm_free(void *mptr)
+{
+    ulong *ptr, *next;
+
+    ptr = ((ulong *)mptr) - 1;
+    *ptr = *ptr & 0xFFFFFFFE; 
+    next = (ulong *)(*ptr & 0xFFFFFFFE); 
+    if ((*next & 1) == 0)
+    {
+        *ptr = *next;
+        tcm_curr_top = ptr;
+    }
+}
+
+//DRAM heap manage part
 extern ulong __heap_start; /* declared in the linker script */
 extern ulong __heap_size;  /* declared in the linker script */
 static ulong heap_top = (ulong) &__heap_start;

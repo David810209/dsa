@@ -58,6 +58,8 @@
 
 void *malloc(size_t n);
 void free(void *m);
+void *tcm_malloc(size_t n);
+void tcm_free(void *m);
 void *calloc(size_t n, size_t sz);
 
 int atoi(char *s);

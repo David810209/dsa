@@ -54,24 +54,28 @@
 // =============================================================================
 */
 
-__stack_size = 0x800;
-__heap_size  = 0x200000;
+__stack_size = 0x800;         /* 堆疊大小: 2 KB */
+__heap_size  = 0x200000;      /* DRAM 堆大小: 2 MB */
+__tcm_heap_size = 0x10000;    /* TCM Heap 大小: 64 KB */
 
 MEMORY
 {
-    code_ram   (rx!rw) : ORIGIN = 0x80001000, LENGTH = 0x10000
-    data_ram   (rw!x)  : ORIGIN = 0x80011000, LENGTH = 0x310000
+    tcm_ram    (rw!x)  : ORIGIN = 0x00001000, LENGTH = 0x10000   /* 64 KB */
+    code_ram   (rx!rw) : ORIGIN = 0x80001000, LENGTH = 0x10000   /* 64 KB */
+    data_ram   (rw!x)  : ORIGIN = 0x80011000, LENGTH = 0x310000  /* 3.1 MB */
 }
 
 ENTRY(crt0)
 
 SECTIONS
 {
+    /* 程式碼段 */
     .text :
     {
         *(.text*)
     } > code_ram
 
+    /* 資料段 */
     .data :
     {
         *(.data)
@@ -79,16 +83,26 @@ SECTIONS
         *(.rodata*)
     } > data_ram
 
+    /* DRAM 堆區 (Heap) */
     .heap : ALIGN(0x10)
     {
         __heap_start = .;
         . += __heap_size;
+        __heap_end = .;
     } > data_ram
 
+    /* DRAM 堆疊區 (Stack) */
     .stack : ALIGN(0x10)
     {
         . += __stack_size;
         __stack_top = .;
     } > data_ram
-}
 
+    /* TCM Heap 區段 */
+    .tcm_heap : ALIGN(0x10)
+    {
+        __tcm_heap_start = .;
+        . += __tcm_heap_size;
+        __tcm_heap_end = .;
+    } > tcm_ram
+}

@@ -99,13 +99,14 @@ float_t *read_weights(char *filename)
     float_t *weights;
 
     size = read_file(filename, fbuf);
-    if ((weights = (float_t *) malloc(size)) == NULL)
+    // if ((weights = (float_t *) malloc(size)) == NULL)
+    if ((weights = (float_t *) tcm_malloc(size)) == NULL)
     {
         printf("read_weights(): Out of memory.\n");
         exit (1);
     }
     printf("read_weights(): size = %d\n", size);
-    weights = (float_t *)0x00001000;
+    // weights = (float_t *)0x00001000;
     memcpy((void *) weights, (void *) fbuf, size);
     return (float_t *) weights;
 }

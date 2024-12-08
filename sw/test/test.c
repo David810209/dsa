@@ -6,7 +6,7 @@ int main()
     float b[10] = {1,2,3,4,5,6,7,8,9,10};
     float test;
     printf("start calculate\n");
-    for(int j = 0;j < 10;j++){
+    for(int j = 0;j < 1;j++){
         for(int i = 0;i < 10;i++){
             *((float volatile *)0xC4100000) = a[i];
             *((float volatile *)0xC4200000) = b[i];

@@ -197,6 +197,24 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
         printf("Error input size not match %lu/%lu\n", input->in_size_, entry->base.in_size_);
         exit(-1);
     }
+    // float_t *tcm_in =NULL;
+    // if((uintptr_t)input->in_ptr_ >= 0x80000000){
+    //     // printf("input->in_ptr_ is in DDR\n");
+    //     tcm_in = (float_t *)tcm_malloc(entry->base.in_size_ * sizeof(float_t));
+    //     memcpy(tcm_in, input->in_ptr_, entry->base.in_size_ * sizeof(float_t));
+    //     input->in_ptr_ = tcm_in;
+    // }
+    // float_t *prev_feature_map =NULL;
+    // // if((uintptr_t)input->in_ptr_ >= 0x80000000){
+    // if(1){
+    //     prev_feature_map = (float_t *)tcm_malloc(entry->base.in_size_ * sizeof(float_t));
+    //     if (!prev_feature_map) {
+    //         printf("Error: TCM allocation failed for previous feature map.\n");
+    //         exit(-1);
+    //     }
+    //     memcpy(prev_feature_map, input->in_ptr_, entry->base.in_size_ * sizeof(float_t));
+    //     input->in_ptr_ = prev_feature_map;
+    // }
     conv_copy_and_pad_input(entry, input);
 
     float_t *a = entry->base.a_ptr_;
@@ -225,10 +243,15 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
 
     for (uint64_t c = 0; c < total_size; c++)
         out[c] = entry->base.activate(a, c, entry->base.out_size_);
+    // if(tcm_in) tcm_free(tcm_in);
+    
+
     
 #ifdef PRINT_LAYER
     printf("[%s] done [%f, %f, ... , %f, %f]\n", entry->base.layer_name_, out[0], out[1], out[entry->base.out_size_-2], out[entry->base.out_size_-1]);
 #endif
+    // if(prev_feature_map) tcm_free(prev_feature_map);
+
 }
 
 layer_base * new_convolutional_layer(
@@ -261,7 +284,8 @@ layer_base * new_convolutional_layer(
                conv_out_dim(in_width, in_height, window_width, window_height, w_padding, h_padding, w_stride, h_stride, pad_type) * out_channels, 
                window_width * window_height * in_channels * out_channels,
                has_bias ? out_channels : 0,
-               activate==relu
+               activate==relu,
+               0 /*last layer*/
               );
 #ifdef PRINT_LAYER
     static uint64_t call_time = 0;
