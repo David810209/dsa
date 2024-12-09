@@ -97,11 +97,11 @@ void fully_connected_layer_forward_propagation(struct list_node *ptr, input_stru
     {
         a[i] = (float_t)0;
         for (uint64_t c = 0; c < entry->base.in_size_; c++){
-            *((float volatile *)0xC4100000) = W[i*entry->base.in_size_ + c] ;
-            *((float volatile *)0xC4200000) = in[c];
+            *((float volatile *)0xC4500000) = W[i*entry->base.in_size_ + c] ;
+            *((float volatile *)0xC4600000) = in[c];
             // a[i] += W[i*entry->base.in_size_ + c] * in[c];
         }
-        a[i] = *((float volatile *)0xC4300000);
+        a[i] = *((float volatile *)0xC4700000);
 
         if (entry->has_bias_)
             a[i] += b[i];
@@ -132,8 +132,7 @@ layer_base * new_fully_connected_layer(
                out_dim,
                in_dim * out_dim,
                has_bias ? out_dim : 0,
-               activate==relu,
-               0 /*last layer*/);
+               activate==relu);
 #ifdef PRINT_LAYER
     static uint64_t call_time = 0;
     sprintf(ret->base.layer_name_, "fc%lu", call_time++);

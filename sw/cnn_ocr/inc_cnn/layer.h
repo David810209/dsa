@@ -89,7 +89,7 @@ typedef struct _layer_base
 } layer_base;
 
 
-void init_layer(layer_base *layer, cnn_controller *ctrl, uint64_t in_dim, uint64_t out_dim, uint64_t weight_dim, uint64_t bias_dim, uint8_t need_space_for_a ,uint8_t is_last_layer)
+void init_layer(layer_base *layer, cnn_controller *ctrl, uint64_t in_dim, uint64_t out_dim, uint64_t weight_dim, uint64_t bias_dim, uint8_t need_space_for_a)
 {
     layer->in_size_ = in_dim;
     layer->out_size_ = out_dim;
@@ -103,11 +103,9 @@ void init_layer(layer_base *layer, cnn_controller *ctrl, uint64_t in_dim, uint64
         layer->padded_ptr = (float_t *)ctrl->lyr_cur_ptr;
         layer->padded = 0;
     }
-    if(is_last_layer) layer->a_ptr_ = (float_t *)malloc(out_dim * sizeof(float_t));
-    else  layer->a_ptr_ = (float_t *)tcm_malloc(out_dim * sizeof(float_t));
+    layer->a_ptr_ = (float_t *)tcm_malloc(out_dim * sizeof(float_t));
     if (need_space_for_a) {
-        if(is_last_layer) layer->out_ptr_ = (float_t *)malloc(out_dim * sizeof(float_t));
-        else layer->out_ptr_ = (float_t *)tcm_malloc(out_dim * sizeof(float_t));
+        layer->out_ptr_ = (float_t *)tcm_malloc(out_dim * sizeof(float_t));
     }
     else 
         layer->out_ptr_ = layer->a_ptr_;

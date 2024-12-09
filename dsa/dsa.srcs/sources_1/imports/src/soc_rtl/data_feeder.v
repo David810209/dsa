@@ -19,14 +19,72 @@ module data_feeder #(
     output reg [XLEN-1 : 0]     data_o
 );
 
-(* keep = "true",  mark_debug = "true" *) reg data_valid;
-(* keep = "true",  mark_debug = "true" *) reg next_data;
-(* keep = "true",  mark_debug = "true" *) wire result_valid;
-(* keep = "true",  mark_debug = "true" *) reg [XLEN-1:0] feeder_dataA;
-(* keep = "true",  mark_debug = "true" *)reg [XLEN-1:0] feeder_dataB;
-(* keep = "true",  mark_debug = "true" *)reg [XLEN-1:0] feeder_dataC;
-(* keep = "true",  mark_debug = "true" *)wire [XLEN-1:0] fp_result_data;
-(* keep = "true",  mark_debug = "true" *)reg [XLEN-1:0] result_reg;
+/*
+in soc_top.v
+data_feeder Data_Feeder
+(
+    // System signals
+    .clk_i(clk),
+    .rst_i(rst),
+
+    // Device bus signals
+    .en_i(dev_strobe & dsa_sel),
+    .we_i(dev_we),
+    .addr_i(dev_addr),
+    .data_i(dev_din),
+    .ready_o(dsa_ready),
+    .data_o(dsa_dout)
+);
+*/
+//weight data
+reg [4:0] load_weight_cnt;
+reg [XLEN-1:0] total_weight;
+reg [XLEN-1:0] weight_data[24:0];
+reg written;
+
+integer  i;
+initial begin
+    for(i = 0; i < 25; i = i + 1)begin
+        weight_data[i] = 0;
+    end
+end
+always @(posedge clk_i) begin
+    if(rst_i)begin
+        load_weight_cnt <= 0;
+        total_weight <= 0;
+        written <= 0;
+    end
+    else if(en_i && we_i && addr_i == 32'hC400_0000) begin
+        total_weight <= data_i;
+        load_weight_cnt <= 0;
+        written <= 0;
+    end
+    else if(S == S_LOAD_WEIGHT)begin
+        if(load_weight_cnt == total_weight)begin
+            load_weight_cnt <= 0;
+        end
+        else
+        if(we_i && addr_i == 32'hC410_0000 && !written)begin
+            weight_data[load_weight_cnt] <= data_i;
+            load_weight_cnt <= load_weight_cnt + 1;
+            written <= 1;
+        end
+        else if(!we_i)begin
+        written <= 0;
+    end
+    end
+    
+end
+
+reg data_valid;
+wire result_valid;
+(* keep = "true",  mark_debug = "true" *)reg [XLEN-1:0] feeder_dataA;
+reg [XLEN-1:0] feeder_dataB;
+reg [XLEN-1:0] feeder_dataC;
+wire [XLEN-1:0] fp_result_data;
+reg [XLEN-1:0] result_reg;
+reg [4:0] calculation_cnt;
+reg next_data;
 
 always @(posedge clk_i)
 begin
@@ -35,36 +93,48 @@ begin
         feeder_dataB <= 0;
         feeder_dataC <= 0;
         data_valid <= 0;
+        calculation_cnt <= 0;
         next_data <= 0;
     end
     else if(en_i)begin
-        if(we_i && addr_i == 32'hC410_0000)begin
+        if(calculation_cnt == total_weight)begin
+            calculation_cnt <= 0;
+        end
+        else if(we_i && addr_i == 32'hC420_0000 && !data_valid)begin
+            feeder_dataA <= weight_data[calculation_cnt];
+            feeder_dataB <= data_i;
+            feeder_dataC <= result_reg;
+            data_valid <= 1;
+            calculation_cnt <= calculation_cnt + 1;
+        end
+        else if(we_i && addr_i == 32'hC450_0000)begin
             feeder_dataA <= data_i;
             next_data <= 1;
         end
-        else if(we_i && addr_i == 32'hC420_0000)begin
+        else if(we_i && addr_i == 32'hC460_0000)begin
             feeder_dataB <= data_i;
             feeder_dataC <= result_reg;
             data_valid <= 1;
         end
-    end
-    else if(data_valid) begin
-            next_data <= 0;
+        else if(!we_i)begin
             data_valid <= 0;
+        end
+    end
+    else begin
+        if(data_valid)begin
+            data_valid <= 0;
+            next_data <= 0;
+        end
     end
 end
 
 reg [1:0] S, S_next;
-localparam S_IDLE = 2'b00, S_CALC = 2'b01;
+localparam S_IDLE = 2'b00, S_LOAD_WEIGHT = 2'b01, S_CALC = 2'b10;
 
 always @(posedge clk_i)
 begin
-    if(rst_i)begin
-        S <= S_IDLE;
-    end
-    else begin
-        S <= S_next;
-    end
+    if(rst_i) S <= S_IDLE;
+    else  S <= S_next;
 end
 
 always @(*)
@@ -72,8 +142,16 @@ begin
     S_next = S;
     case(S)
         S_IDLE:begin
-            if(data_valid && next_data)begin
+            if(en_i && we_i && addr_i == 32'hC400_0000)begin
+                S_next = S_LOAD_WEIGHT;
+            end
+            else if(data_valid)begin
                 S_next = S_CALC;
+            end
+        end
+        S_LOAD_WEIGHT:begin
+            if(load_weight_cnt == total_weight)begin
+                S_next = S_IDLE;
             end
         end
         S_CALC:begin
@@ -96,16 +174,14 @@ begin
         result_reg <= fp_result_data;
         send <= 0;
     end
-    else if(!we_i && addr_i == 32'hC430_0000 && send == 0)begin
+    else if(!we_i && (addr_i == 32'hC430_0000 || addr_i == 32'hC470_0000) && send == 0)begin
             result_reg <= 0;
             data_o <= result_reg;
             send <= 1;
     end
 end
-//assign ready_o = S == S_IDLE;
 
 assign ready_o = 1;
-
 floating_point_0 floating_point_0(
     .aclk(clk_i),
     .s_axis_a_tvalid(data_valid),

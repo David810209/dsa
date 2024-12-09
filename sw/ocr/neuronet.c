@@ -47,9 +47,27 @@ void neuronet_init(NeuroNet *nn, int n_layers, int *n_neurons)
         nn->total_neurons += n_neurons[layer_idx];
     }
 
-    nn->neurons = (float *)malloc(sizeof(float *) * nn->total_neurons);
-    nn->forward_weights = (float **)malloc(sizeof(float *) * nn->total_neurons);
-    nn->previous_neurons = (float **)malloc(sizeof(float *) * nn->total_neurons);
+    nn->neurons = (float *)tcm_malloc(sizeof(float *) * nn->total_neurons);
+    if(nn->neurons == NULL)
+    {
+        printf("ERROR!!!\n");
+        printf("neurons malloc failed\n");
+        return;
+    }
+    nn->forward_weights = (float **)tcm_malloc(sizeof(float *) * nn->total_neurons);
+    if(nn->forward_weights == NULL)
+    {
+        printf("ERROR!!!\n");
+        printf("forward_weights malloc failed\n");
+        return;
+    }
+    nn->previous_neurons = (float **)tcm_malloc(sizeof(float *) * nn->total_neurons);
+    if(nn->previous_neurons == NULL)
+    {
+        printf("ERROR!!!\n");
+        printf("previous_neurons malloc failed\n");
+        return;
+    }
     nn->total_layers = n_layers;
 
     neuron_idx = 0;
@@ -104,9 +122,9 @@ void neuronet_load(NeuroNet *nn, float *weights)
 void neuronet_free(NeuroNet *nn)
 {
     free(nn->weights);
-    free(nn->previous_neurons);
-    free(nn->forward_weights);
-    free(nn->neurons);
+    tcm_free(nn->previous_neurons);
+    tcm_free(nn->forward_weights);
+    tcm_free(nn->neurons);
 }
 
 int neuronet_eval(NeuroNet *nn, float *images)

@@ -24,9 +24,11 @@ This project focuses on implementing a **Domain-Specific Accelerator (DSA)** to 
 
 4. **Heap Management in TCM**  
    - Stored the **weight arrays** and **previous layer's feature maps** in **TCM (Tightly Coupled Memory)** using a dynamically managed **TCM heap**. Custom **tcm_malloc** and **tcm_free** functions were implemented, alongside linker script modifications to ensure seamless allocation without conflicting with boot code. This optimization effectively reduces cache latency and improves memory access efficiency.
+5. **Weight Preload Optimization in conv3d**
+   - To reduce memory access latency, 25 weights (5x5 kernel) are preloaded into hardware registers. During image traversal, only image data is sent to the hardware, where it is combined with the preloaded weights and passed to the Floating-Point IP core for fused multiply-add (FMA) operations. The results are then stored in the output buffer. This design eliminates redundant weight loading and ensures efficient weight reuse across the sliding window, improving computational efficiency.
 
-5. **Current Performance**  
-   - Execution time reduced: **21502 ms → 3270 ms** (6.58x speedup).  
+6. **Current Performance**  
+   - Execution time reduced: **21502 ms → 2872 ms** (7.49x speedup).  
 
 
 ---

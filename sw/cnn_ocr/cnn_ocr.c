@@ -81,7 +81,6 @@ int main()
     nn = (network *) malloc(sizeof(network));
     memset((void *) &ctrl, 0, sizeof(cnn_controller));
     ctrl.wgt_cur_ptr = weights;
-
     init_network(nn);
     push_back(&new_dummy_head_layer(&ctrl, identity, image_size)->list, &nn->layers);
     push_back(&new_convolutional_layer(&ctrl, relu, 28, 28, 5, 5, 1, 3, same, 1, 1, 1, 0, 0)->list, &nn->layers);

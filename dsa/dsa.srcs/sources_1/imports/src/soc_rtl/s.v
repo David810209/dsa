@@ -1,332 +1,101 @@
+
 `timescale 1ns / 1ps
-// =============================================================================
-//  Program : soc_tb.v
-//  Author  : Chun-Jen Tsai
-//  Date    : Feb/24/2020
-// -----------------------------------------------------------------------------
-//  Description:
-//  This is the top-level Aquila testbench.
-// -----------------------------------------------------------------------------
-//  Revision information:
-//
-//  None.
-// -----------------------------------------------------------------------------
-//  License information:
-//
-//  This software is released under the BSD-3-Clause Licence,
-//  see https://opensource.org/licenses/BSD-3-Clause for details.
-//  In the following license statements, "software" refers to the
-//  "source code" of the complete hardware/software system.
-//
-//  Copyright 2019,
-//                    Embedded Intelligent Systems Lab (EISL)
-//                    Deparment of Computer Science
-//                    National Chiao Tung Uniersity
-//                    Hsinchu, Taiwan.
-//
-//  All rights reserved.
-//
-//  Redistribution and use in source and binary forms, with or without
-//  modification, are permitted provided that the following conditions are met:
-//
-//  1. Redistributions of source code must retain the above copyright notice,
-//     this list of conditions and the following disclaimer.
-//
-//  2. Redistributions in binary form must reproduce the above copyright notice,
-//     this list of conditions and the following disclaimer in the documentation
-//     and/or other materials provided with the distribution.
-//
-//  3. Neither the name of the copyright holder nor the names of its contributors
-//     may be used to endorse or promote products derived from this software
-//     without specific prior written permission.
-//
-//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-//  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-//  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-//  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-//  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-//  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-//  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-//  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-//  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-//  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-//  POSSIBILITY OF SUCH DAMAGE.
-// =============================================================================
+
 `include "aquila_config.vh"
 
-`define SIM_CLK_RATE 100_000_000
+module data_feeder #(
+    parameter XLEN = 32
+) (
+    // System signals
+    input                   clk_i,
+    input                   rst_i,
 
-module soc_tb #( parameter XLEN = 32, parameter CLSIZE = `CLP )();
-
-reg  sys_reset = 1;
-reg  sys_clock = 0;
-
-wire usr_reset;
-wire ui_clk, ui_rst;
-wire clk, rst;
-
-// uart
-wire                uart_rx = 1; /* When the UART rx line is idle, it carries '1'. */
-wire                uart_tx;
-
-// --------- External memory interface -----------------------------------------
-// Instruction memory ports
-wire                IMEM_strobe;
-wire [XLEN-1 : 0]   IMEM_addr;
-wire                IMEM_done;
-wire [CLSIZE-1 : 0] IMEM_data;
-
-// Data memory ports
-wire                DMEM_strobe;
-wire [XLEN-1 : 0]   DMEM_addr;
-wire                DMEM_rw;
-wire [CLSIZE-1 : 0] DMEM_wt_data;
-wire                DMEM_done;
-wire [CLSIZE-1 : 0] DMEM_rd_data;
-
-// --------- I/O device interface ----------------------------------------------
-// Device bus signals
-wire                dev_strobe;
-wire [XLEN-1 : 0]   dev_addr;
-wire                dev_we;
-wire [XLEN/8-1 : 0] dev_be;
-wire [XLEN-1 : 0]   dev_din;
-wire [XLEN-1 : 0]   dev_dout;
-wire                dev_ready;
-
-// DSA device signals (Not used for HW#0 ~ HW#4)
-wire                dsa_sel;
-wire [XLEN-1 : 0]   dsa_dout;
-wire                dsa_ready;
-
-// uart
-wire                uart_sel;
-wire [XLEN-1 : 0]   uart_dout;
-wire                uart_ready;
-
-// External reset signal
-assign usr_reset = sys_reset;
-
-// --------- System Clock Generator --------------------------------------------
-assign clk = sys_clock;
-
-always
-  #((1_000_000_000/`SIM_CLK_RATE)/2) sys_clock <= ~sys_clock; // 100 MHz
-
-// -----------------------------------------------------------------------------
-// For the Aquila Core, the reset (rst) will lasts for 5 cycles to clear
-//   all the pipeline registers.
-//
-localparam RST_CYCLES=5;
-reg [RST_CYCLES-1 : 0] rst_count = {RST_CYCLES{1'b1}};
-assign rst = rst_count[RST_CYCLES-1];
-
-always @(posedge clk)
-begin
-    if (usr_reset)
-        rst_count <= {RST_CYCLES{1'b1}};
-    else
-        rst_count <= {rst_count[RST_CYCLES-2 : 0], 1'b0};
-end
-
-// Simulate a clock-domain for DRAM
-assign ui_clk = sys_clock;
-assign ui_rst = rst_count[RST_CYCLES-1];
-wire [XLEN-1 : 0] aquila_pc;
-// -----------------------------------------------------------------------------
-//  Aquila processor core.
-//
-aquila_top Aquila_SoC
-(
-    .clk_i(clk),
-    .rst_i(rst),          // level-sensitive reset signal.
-    .base_addr_i(32'b0),  // initial program counter.
-
-    // External instruction memory ports.
-    .M_IMEM_strobe_o(IMEM_strobe),
-    .M_IMEM_addr_o(IMEM_addr),
-    .M_IMEM_done_i(IMEM_done),
-    .M_IMEM_data_i(IMEM_data),
-
-    // External data memory ports.
-    .M_DMEM_strobe_o(DMEM_strobe),
-    .M_DMEM_addr_o(DMEM_addr),
-    .M_DMEM_rw_o(DMEM_rw),
-    .M_DMEM_data_o(DMEM_wt_data),
-    .M_DMEM_done_i(DMEM_done),
-    .M_DMEM_data_i(DMEM_rd_data),
-
-    // I/O device ports.
-    .M_DEVICE_strobe_o(dev_strobe),
-    .M_DEVICE_addr_o(dev_addr),
-    .M_DEVICE_rw_o(dev_we),
-    .M_DEVICE_byte_enable_o(dev_be),
-    .M_DEVICE_data_o(dev_din),
-    .M_DEVICE_data_ready_i(dev_ready),
-    .M_DEVICE_data_i(dev_dout),
-
-    .to_tb_pc_o(aquila_pc)
+    // Device bus signals
+    input                   en_i,
+    input                   we_i,
+    input [XLEN-1 : 0]      addr_i,
+    input [XLEN-1 : 0]      data_i,
+    output                  ready_o,
+    output reg [XLEN-1 : 0]     data_o
 );
-
-// -----------------------------------------------------------------------------
-//  Device address decoder.
-//
-//       [0] 0xC000_0000 - 0xC0FF_FFFF : UART device
-//       [1] 0xC400_0000 - 0xC4FF_FFFF : DSA device
-assign uart_sel  = (dev_addr[XLEN-1:XLEN-8] == 8'hC0);
-assign dsa_sel   = (dev_addr[XLEN-1:XLEN-8] == 8'hC2);
-assign dev_dout  = (uart_sel)? uart_dout : (dsa_sel)? dsa_dout : {XLEN{1'b0}};
-assign dev_ready = (uart_sel)? uart_ready : (dsa_sel)? dsa_ready : {XLEN{1'b0}};
-
-// ----------------------------------------------------------------------------
-//  UART Controller with a simple memory-mapped I/O interface.
-//
-`define BAUD_RATE	115200
-
-wire simulation_finished;
-wire simulation_tmp =aquila_pc == 32'h0000_0608;
-
-uart #(.BAUD(`SIM_CLK_RATE/`BAUD_RATE))
-UART(
-    .clk(clk),
-    .rst(rst),
-
-    .EN(dev_strobe & uart_sel),
-    .ADDR(dev_addr[3:2]),
-    .WR(dev_we),
-    .BE(dev_be),
-    .DATAI(dev_din),
-    .DATAO(uart_dout),
-    .READY(uart_ready),
-
-    .RXD(uart_rx),
-    .TXD(uart_tx),
-
-    .simulation_done(simulation_finished)
-);
-
-// ----------------------------------------------------------------------------
-//  Print simulation termination message.
-//
-always @(posedge clk)
-begin
-    if (simulation_tmp) begin
-        $display();
-        $display("Simulation finished.");
-        $finish();
-    end
-end
-
-// ----------------------------------------------------------------------------
-//  Reset logic simulation.
-//
-reg reset_trigger;
-
-initial begin
-  forever begin
-    @ (posedge reset_trigger);
-    sys_reset = 1;
-    @ (posedge clk);
-    @ (posedge clk);
-    sys_reset = 0;
-  end
-end
-
-initial
-begin: TEST_CASE
-  #10 reset_trigger = 1;
-  @(negedge sys_reset)
-  reset_trigger = 0;
-end
-
-//-------------------------------------------------------------------------
-//inner product
-//-------------------------------------------------------------------------
-assign dsa_ready = (S != S_CALC);
-reg [XLEN - 1: 0] result_data_o;
-assign dsa_dout = result_data_o;
-
-reg [XLEN - 1: 0] feeder_dataA0, feeder_dataA1, feeder_dataA2;
-reg [XLEN - 1: 0] feeder_dataB0, feeder_dataB1, feeder_dataB2;
 
 reg data_valid;
+reg next_data;
+wire result_valid;
 
-always @(posedge clk)
-begin
-    if(rst)begin
-        feeder_dataA0 <= 32'b0;
-        feeder_dataA1 <= 32'b0;
-        feeder_dataA2 <= 32'b0;
-        feeder_dataB0 <= 32'b0;
-        feeder_dataB1 <= 32'b0;
-        feeder_dataB2 <= 32'b0;
-        data_valid <= 1'b0;
+//weight data
+reg [4:0] load_weight_cnt;
+reg [XLEN-1:0] total_weight;
+reg [XLEN-1:0] weight_data[24:0];
+initial begin
+    integer  i;
+    for(i = 0; i < 25; i = i + 1)begin
+        weight_data[i] = 0;
     end
-    else if(dev_strobe & dsa_sel)begin
-        if(dev_addr == 32'hC200_0000)begin
-            if(dev_we)begin
-                feeder_dataA0 <= dev_din;
-            end
-            else begin
-                result_data_o <= feeder_dataA0;
-            end
+end
+always @(posedge clk_i) begin
+    if(rst_i)begin
+        load_weight_cnt <= 0;
+        total_weight <= 0;
+    end
+    else if(en_i && we_i && addr_i == 32'hC400_0000) begin
+        total_weight <= data_i;
+    end
+    else if(S == S_LOAD_WEIGHT)begin
+        if(load_weight_cnt == total_weight)begin
+            load_weight_cnt <= 0;
         end
-        else if(dev_addr == 32'hC200_0004)begin
-            if(dev_we)begin
-                feeder_dataA1 <= dev_din;
-            end
-            else begin
-                result_data_o <= feeder_dataA1;
-            end
+        else
+        if(we_i && addr_i == 32'hC410_0000)begin
+            weight_data[load_weight_cnt] <= data_i;
+            load_weight_cnt <= load_weight_cnt + 1;
         end
-        else if(dev_addr == 32'hC200_0008)begin
-            if(dev_we)begin
-                feeder_dataA2 <= dev_din;
-            end
-            else begin
-                result_data_o <= feeder_dataA2;
-            end
+    end
+end
+
+//calculate data
+reg [XLEN-1:0] feeder_dataA;
+reg [XLEN-1:0] feeder_dataB;
+reg [XLEN-1:0] feeder_dataC;
+wire [XLEN-1:0] fp_result_data;
+reg [XLEN-1:0] result_reg;
+
+reg [4:0] load_image_cnt;
+
+
+
+always @(posedge clk_i)
+begin
+    if(rst_i)begin
+        feeder_dataA <= 0;
+        feeder_dataB <= 0;
+        feeder_dataC <= 0;
+        data_valid <= 0;
+        next_data <= 0;
+        load_image_cnt <= 0;
+    end
+    else if(en_i && we_i && addr_i == 32'hC420_0000 && data_valid == 0)begin
+        if(load_image_cnt == total_weight)begin
+            load_image_cnt <= 0;
         end
-        else if(dev_addr == 32'hC200_000C)begin
-            if(dev_we)begin
-                feeder_dataB0 <= dev_din;
-            end
-            else begin
-                result_data_o <= feeder_dataB0;
-            end
+        else begin
+            feeder_dataA <= weight_data[load_image_cnt];
+            feeder_dataB <= data_i;
+            feeder_dataC <= result_reg;
+            data_valid <= 1;
         end
-        else if(dev_addr == 32'hC200_0010)begin
-            if(dev_we)begin
-                feeder_dataB1 <= dev_din;
-            end
-            else begin
-                result_data_o <= feeder_dataB1;
-            end
-        end
-        else if(dev_addr == 32'hC200_0014)begin
-            if(dev_we)begin
-                feeder_dataB2 <= dev_din;
-                data_valid <= 1'b1;
-            end
-            else begin
-                result_data_o <= feeder_dataB2;
-            end
-        end
-        else if(dev_addr == 32'hC200_0018 && result_valid)begin
-            result_data_o <= result_data;
-        end
-        else if(data_valid)begin
-            data_valid <= 1'b0;
-        end
+    end
+    else if(result_valid) begin
+            data_valid <= 0;
     end
 end
 
 reg [1:0] S, S_next;
-localparam S_IDLE = 2'b00, S_CALC = 2'b01, S_WAIT = 2'b10;
+localparam S_IDLE = 2'b00, S_LOAD_WEIGHT = 2'b01, S_CALC = 2'b10;
 
-always @(posedge clk)
+always @(posedge clk_i)
 begin
-    if(rst)begin
+    if(rst_i)begin
         S <= S_IDLE;
     end
     else begin
@@ -339,42 +108,62 @@ begin
     S_next = S;
     case(S)
         S_IDLE:begin
-            if(data_valid)begin
+            if(en_i && we_i && addr_i == 32'hC400_0000)begin
+                S_next = S_LOAD_WEIGHT;
+            end
+            else if(data_valid)begin
                 S_next = S_CALC;
+            end
+        end
+        S_LOAD_WEIGHT:begin
+            if(load_weight_cnt == total_weight)begin
+                S_next = S_IDLE;
             end
         end
         S_CALC:begin
             if(result_valid)begin
-                S_next = S_WAIT;
-            end
-        end
-        S_WAIT:begin
-            if(dev_addr == 32'hC200_0018)begin
                 S_next = S_IDLE;
             end
         end
     endcase
 end
 
-reg [XLEN - 1: 0] result_data;
-reg result_valid;
-
-always @(posedge clk) begin
-    if(rst)begin
-        result_data <= 32'b0;
-        result_valid <= 1'b0;
+reg send;
+always @(posedge clk_i)
+begin
+    if(rst_i)begin
+        result_reg <= 0;
+        data_o <= 0;
+        send <= 0;
     end
-    else
-    if(data_valid)begin
-        result_data <= feeder_dataA0 * feeder_dataB0 +
-                      feeder_dataA1 * feeder_dataB1 + 
-                      feeder_dataA2 * feeder_dataB2;
-        result_valid <= 1'b1;
+    else if(result_valid)begin
+        result_reg <= fp_result_data;
+        send <= 0;
     end
-    if(S == S_IDLE)begin
-        result_valid <= 1'b0;
+    else if(!we_i && addr_i == 32'hC430_0000 && send == 0)begin
+            result_reg <= 0;
+            data_o <= result_reg;
+            send <= 1;
     end
 end
+//assign ready_o = S == S_IDLE;
+
+assign ready_o = 1;
+
+floating_point_0 floating_point_0(
+    .aclk(clk_i),
+    .s_axis_a_tvalid(data_valid),
+    .s_axis_a_tdata(feeder_dataA),
+
+    .s_axis_b_tvalid(data_valid),
+    .s_axis_b_tdata(feeder_dataB),
+
+    .s_axis_c_tvalid(data_valid),
+    .s_axis_c_tdata(feeder_dataC),
+
+    .m_axis_result_tvalid(result_valid),
+    .m_axis_result_tdata(fp_result_data)
+);
+
 
 endmodule
-

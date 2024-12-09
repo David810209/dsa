@@ -163,13 +163,18 @@ void conv_3d(uint64_t o, convolutional_layer *entry, float_t *pa)
         float_t * ppi = &in[get_index(&in_padded_, 0, 0, inc)];
         uint64_t idx = 0;
         const uint64_t inner_loop_iter = weight_.height_ * weight_.width_;
+        *((int volatile *)0xC4000000) = inner_loop_iter; // trigger load weight.
+        const float_t * ppw = pw;
+        for(int i = 0; i < inner_loop_iter; i++){
+            *((float volatile *)0xC4100000) = *ppw++;
+        }
         for (uint64_t y = 0; y < out_.height_; y++) {
             for (uint64_t x = 0; x < out_.width_; x++) {
-                const float_t * ppw = pw;
-                float_t sum = (float_t)0;
+                // const float_t * ppw = pw;
+                // float_t sum = (float_t)0;
                 uint64_t wx = 0, widx = 0;
                 for (uint64_t wyx = 0; wyx < inner_loop_iter; wyx++) {
-                    *((float volatile *)0xC4100000) = *ppw++;
+                    // *((float volatile *)0xC4100000) = *ppw++;
                     *((float volatile *)0xC4200000) = ppi[widx];
                     // sum += *ppw++ * ppi[widx];
                     wx++;
@@ -180,8 +185,7 @@ void conv_3d(uint64_t o, convolutional_layer *entry, float_t *pa)
                         widx += const1;
                     }
                 }
-                sum = *((float volatile *)0xC4300000);
-                pa[idx++] += sum;
+                pa[idx++] += *((float volatile *)0xC4300000);
                 ppi += w_stride_;
             }
             ppi += const2;
@@ -284,8 +288,7 @@ layer_base * new_convolutional_layer(
                conv_out_dim(in_width, in_height, window_width, window_height, w_padding, h_padding, w_stride, h_stride, pad_type) * out_channels, 
                window_width * window_height * in_channels * out_channels,
                has_bias ? out_channels : 0,
-               activate==relu,
-               0 /*last layer*/
+               activate==relu
               );
 #ifdef PRINT_LAYER
     static uint64_t call_time = 0;

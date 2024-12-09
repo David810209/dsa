@@ -152,8 +152,7 @@ layer_base * new_average_pooling_layer(
                pool_out_dim(in_width, pooling_size, stride) * pool_out_dim(in_height, pooling_size, stride) * in_channels, 
                0,
                0,
-               activate==relu,
-               0 /*last layer*/);
+               activate==relu);
 #ifdef PRINT_LAYER
     static uint64_t call_time = 0;
     sprintf(ret->base.layer_name_, "avg_pool%lu", call_time++);
