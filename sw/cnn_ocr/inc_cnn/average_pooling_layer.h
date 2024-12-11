@@ -118,14 +118,14 @@ void average_pooling_layer_forward_propagation(struct list_node *ptr, input_stru
         for (uint64_t dy = 0; dy < dymax; dy++)
             for (uint64_t dx = 0; dx < dxmax; dx++)
             {
-                *((float volatile *)0xC4300014) = a[o];
-                *((float volatile *)0xC4300018) =in[get_index(&in_, x + dx, y + dy, c)] ;
-                a[o] = *((float volatile *)0xC4300004);
+                *((float volatile *)0xC4400000) = a[o];
+                *((float volatile *)0xC4400004) =in[get_index(&in_, x + dx, y + dy, c)] ;
+                a[o] = *((float volatile *)0xC4400008);
                 // a[o] += in[get_index(&in_, x + dx, y + dy, c)];
             }
-        *((float volatile *)0xC4300008) <= a[o];
-        *((float volatile *)0xC430000c) <= entry->scale_factor_;
-        a[o] = *((float volatile *)0xC4300010);
+        *((float volatile *)0xC440000c) = a[o];
+        *((float volatile *)0xC4400010) = entry->scale_factor_;
+        a[o] = *((float volatile *)0xC4400014);
         // a[o] *= entry->scale_factor_;
     }
 

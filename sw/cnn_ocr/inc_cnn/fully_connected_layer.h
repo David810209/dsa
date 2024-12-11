@@ -99,11 +99,11 @@ void fully_connected_layer_forward_propagation(struct list_node *ptr, input_stru
     {
         a[i] = (float_t)0;
         for (uint64_t c = 0; c < entry->base.in_size_; c++){
-            *((float volatile *)0xC4500000) = W[i*entry->base.in_size_ + c] ;
-            *((float volatile *)0xC4600000) = in[c];
+            *((float volatile *)0xC4400018) = W[i*entry->base.in_size_ + c] ;
+            *((float volatile *)0xC440001c) = in[c];
             // a[i] += W[i*entry->base.in_size_ + c] * in[c];
         }
-        a[i] = *((float volatile *)0xC4700000);
+        a[i] = *((float volatile *)0xC4400020);
 
         if (entry->has_bias_)
             a[i] += b[i];

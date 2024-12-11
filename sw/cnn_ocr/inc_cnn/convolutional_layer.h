@@ -153,59 +153,61 @@ void conv_3d(uint64_t o, convolutional_layer *entry, float_t *pa)
     index3d weight_ = entry->weight_;
     const uint64_t const1 = in_.width_ - weight_.width_;
     const uint64_t const2 = in_.width_ - out_.width_;
+            //initialize register
+    *((int volatile *)0xC4300000) = in_.width_;
+    *((int volatile *)0xC4300004) = out_.width_;
+    *((int volatile *)0xC4300008) = weight_.width_;
 
     for (uint64_t inc = 0; inc < in_.depth_; inc++) {
         const float_t *pw = &W[get_index(&weight_, 0, 0, in_.depth_ * o + inc)];
 
         // Convert repeatedly calculated numbers to constants.
+
         //load image into register
         float_t * ppi = &in[get_index(&in_, 0, 0, inc)];
-        uint64_t idx = 0;
-        // 計算*ppi最遠的位置
-        // uint64_t input_image_size = (out_.width_ + const2) * out_.height_;
-        // *((int volatile *)0xC4100000) = input_image_size;
-        // for(int i = 0;i < input_image_size; i++)
-        // {
-        //     *((float volatile *)0xC4100004) = *ppi++;
-        // }
-        const uint64_t inner_loop_iter = weight_.height_ * weight_.width_;
+        // uint64_t idx = 0;
+        uint64_t input_image_size = in_.width_ * in_.height_;
+        *((int volatile *)0xC4100000) = 1;
+        for(int i = 0;i < input_image_size; i++)
+        {
+            *((float volatile *)0xC4100004) = *ppi++;
+        }
+
         // load weight into register
-        *((int volatile *)0xC4000000) = inner_loop_iter; // trigger load weight.
+        *((int volatile *)0xC4000000) = 1; // trigger load weight.
         const float_t * ppw = pw;
         for(int i = 0; i < 25; i++){
-            *((float volatile *)0xC4100000) = *ppw++;
+            *((float volatile *)0xC4000004) = *ppw++;
         }
-        //initialize register
-        // *((float volatile *)0xC4300000) = out_.height_;
-
-        for (uint64_t y = 0; y < out_.height_; y++) {
-            for (uint64_t x = 0; x < out_.width_; x++) {
-                // const float_t * ppw = pw;
-                // float_t sum = (float_t)0;
-                uint64_t wx = 0, widx = 0;
-                for (uint64_t wyx = 0; wyx < inner_loop_iter; wyx++) {
-                    // *((float volatile *)0xC4100000) = *ppw++;
-                    *((float volatile *)0xC4200000) = ppi[widx];
-                    // sum += *ppw++ * ppi[widx];
-                    wx++;
-                    widx++;
-                    if (wx == weight_.width_)
-                    {
-                        wx = 0;
-                        widx += const1;
-                    }
-                }
-                *((float volatile *)0xC4300000) = pa[idx]; 
-                pa[idx] = *((float volatile *)0xC4300004);
-                // pa[idx] += *((float volatile *)0xC4700000);
-                idx++;
-                // ppi += w_stride_;
-                ppi++;
-            }
-            ppi += const2;
-        }
+        *((int volatile *)0xC430000c) = 1; // trigger calculation.
+        while(*((int volatile *)0xC430000c) == 0);
+        // for (uint64_t y = 0; y < out_.height_; y++) {
+        //     for (uint64_t x = 0; x < out_.width_; x++) {
+        //         // const float_t * ppw = pw;
+        //         // float_t sum = (float_t)0;
+        //         uint64_t wx = 0, widx = 0;
+        //         for (uint64_t wyx = 0; wyx < inner_loop_iter; wyx++) {
+        //             // *((float volatile *)0xC4100000) = *ppw++;
+        //             *((float volatile *)0xC4200000) = ppi[widx];
+        //             // sum += *ppw++ * ppi[widx];
+        //             wx++;
+        //             widx++;
+        //             if (wx == weight_.width_)
+        //             {
+        //                 wx = 0;
+        //                 widx += const1;
+        //             }
+        //         }
+        //         *((float volatile *)0xC4300000) = pa[idx]; 
+        //         pa[idx] = *((float volatile *)0xC4300004);
+        //         // pa[idx] += *((float volatile *)0xC4700000);
+        //         idx++;
+        //         // ppi += w_stride_;
+        //         ppi++;
+        //     }
+        //     ppi += const2;
+        // }
     }
-    
 }
 
 void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct *input)
@@ -232,14 +234,22 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
     for (uint64_t o = 0; o < total_size; o++)
     {
         float_t *pa = &a[get_index(&out_, 0, 0, o)];
-        memset((void*)pa, 0, out_dim *sizeof(float_t));
+        // memset((void*)pa, 0, out_dim *sizeof(float_t));
         //trigger register reset zero
-        *((float volatile *)0xC4200000) = out_.width_ * out_.height_;
+        *((int volatile *)0xC4200000) = out_dim;
         conv_3d(o, entry, pa);
-
+        for(int i = 0; i < out_dim; i++)
+        {
+            pa[i] = *((float volatile *)0xC4200004);
+        }
         if (entry->has_bias_) {
-            for (uint64_t index = 0; index < out_dim; index++)
-                pa[index] += b[o];
+            for (uint64_t index = 0; index < out_dim; index++){
+                *((float volatile *)0xC4400000) = pa[index];
+                *((float volatile *)0xC4400004) = b[o];
+                pa[index] = *((float volatile *)0xC4400008);
+                // pa[index] += b[o];
+            }
+                
         }
     }
 

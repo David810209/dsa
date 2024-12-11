@@ -10,26 +10,31 @@ This project focuses on implementing a **Domain-Specific Accelerator (DSA)** to 
 
 ---
 
-## **Current Progress**  
+## **Current Progress**
 
-1. **MMIO-based Communication**  
+1. **Current Performance**  
+   - Execution time reduced: **21502 ms → 1156 ms** (18.6x speedup).  
+
+2. **MMIO-based Communication**  
    - Uses **Memory-Mapped I/O (MMIO)** for communication between the CPU and the accelerator, enabling efficient hardware-software co-design.  
 
-2. **Floating-Point IP Acceleration**  
+3. **Floating-Point IP Acceleration**  
    - Integrated three floating-point IP core in **Vivado**, utilizing a non-blocking approach to accelerate inner product calculations, floating point multiplication, addition and reduce bottlenecks.  
 
-3. **CNN Optimization**  
+4. **CNN Optimization**  
    - **Convolutional Layer Optimization**: Improved the speed of inner product calculations and addition in the `convolutional_layer.h` file, specifically for the **conv3d** function.  
+     - 將部分 **conv3D 計算** 移至硬體電路運行，首先將 **image** 和 **weight** 資料傳入硬體，經計算後再將結果傳回，顯著提高運算效率。  
    - **Fully Connected Layer Optimization**: Enhanced the efficiency of inner product computations in the **fully_connected_layer**.  
-    - **Average pooling Layer Optimization**: Improved the speed of inner product calculations and addition.  
+   - **Average Pooling Layer Optimization**: Improved the speed of inner product calculations and addition.  
 
-4. **Heap Management in TCM**  
-   - Stored the **weight arrays** and **previous layer's feature maps** in **TCM (Tightly Coupled Memory)** using a dynamically managed **TCM heap**. Custom **tcm_malloc** and **tcm_free** functions were implemented, alongside linker script modifications to ensure seamless allocation without conflicting with boot code. This optimization effectively reduces cache latency and improves memory access efficiency.
-5. **Weight Preload Optimization in conv3d**
-   - To reduce memory access latency, 25 weights (5x5 kernel) are preloaded into hardware registers. During image traversal, only image data is sent to the hardware, where it is combined with the preloaded weights and passed to the Floating-Point IP core for fused multiply-add (FMA) operations. The results are then stored in the output buffer. This design eliminates redundant weight loading and ensures efficient weight reuse across the sliding window, improving computational efficiency.
+5. **Heap Management in TCM**  
+   - Stored the **weight arrays** and **previous layer's feature maps** in **TCM (Tightly Coupled Memory)** using a dynamically managed **TCM heap**. Custom **tcm_malloc** and **tcm_free** functions were implemented, alongside linker script modifications to ensure seamless allocation without conflicting with boot code. This optimization effectively reduces cache latency and improves memory access efficiency.  
 
-6. **Current Performance**  
-   - Execution time reduced: **21502 ms → 2363 ms** (9.1x speedup).  
+6. **Weight Preload Optimization in conv3d**  
+   - To reduce memory access latency, 25 weights (5x5 kernel) are preloaded into hardware registers. During image traversal, only image data is sent to the hardware, where it is combined with the preloaded weights and passed to the Floating-Point IP core for fused multiply-add (FMA) operations. The results are then stored in the output buffer. This design eliminates redundant weight loading and ensures efficient weight reuse across the sliding window, improving computational efficiency.  
+
+
+
 
 
 ---

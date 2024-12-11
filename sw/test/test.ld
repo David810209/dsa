@@ -56,9 +56,11 @@
 
 __stack_size = 0x800;
 __heap_size  = 0x2000;
+__tcm_heap_size = 0x10000;   
 
 MEMORY
 {
+    tcm_ram    (rw!x)  : ORIGIN = 0x00001000, LENGTH = 0x10000 
     code_ram   (rx!rw) : ORIGIN = 0x80001000, LENGTH = 0x7000
     data_ram   (rw!x)  : ORIGIN = 0x80008000, LENGTH = 0x8000
 }
@@ -90,5 +92,12 @@ SECTIONS
         . += __stack_size;
         __stack_top = .;
     } > data_ram
+
+    .tcm_heap : ALIGN(0x10)
+    {
+        __tcm_heap_start = .;
+        . += __tcm_heap_size;
+        __tcm_heap_end = .;
+    } > tcm_ram
 }
 
