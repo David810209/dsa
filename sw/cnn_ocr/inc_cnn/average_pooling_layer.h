@@ -61,6 +61,7 @@
 #include "list.h"
 #include "util.h"
 #include "activation_function.h"
+// #include <time.h>
 
 typedef struct _average_pooling_layer
 {
@@ -79,6 +80,8 @@ average_pooling_layer * get_average_pooling_layer_entry(struct list_node *ptr)
 
 void average_pooling_layer_forward_propagation(struct list_node *ptr, input_struct *input)
 {
+    // clock_t tick,ticks_per_msec = CLOCKS_PER_SEC/1000;
+    // tick = clock();
     average_pooling_layer *entry = get_average_pooling_layer_entry(ptr);
     if (input->in_size_ != entry->base.in_size_)
     {
@@ -115,14 +118,21 @@ void average_pooling_layer_forward_propagation(struct list_node *ptr, input_stru
         for (uint64_t dy = 0; dy < dymax; dy++)
             for (uint64_t dx = 0; dx < dxmax; dx++)
             {
-                a[o] += in[get_index(&in_, x + dx, y + dy, c)];
+                *((float volatile *)0xC4300014) = a[o];
+                *((float volatile *)0xC4300018) =in[get_index(&in_, x + dx, y + dy, c)] ;
+                a[o] = *((float volatile *)0xC4300004);
+                // a[o] += in[get_index(&in_, x + dx, y + dy, c)];
             }
-        a[o] *= entry->scale_factor_;
+        *((float volatile *)0xC4300008) <= a[o];
+        *((float volatile *)0xC430000c) <= entry->scale_factor_;
+        a[o] = *((float volatile *)0xC4300010);
+        // a[o] *= entry->scale_factor_;
     }
 
-    for (uint64_t o = 0; o < total_size; o++)
-        out[o] = entry->base.activate(a, o, entry->base.out_size_);
-    
+    // for (uint64_t o = 0; o < total_size; o++)
+    //     out[o] = entry->base.activate(a, o, entry->base.out_size_);
+    // tick  = (clock() - tick)/ticks_per_msec;
+    // pooling += tick;
 #ifdef PRINT_LAYER
     printf("[%s] done [%f, %f, ... , %f, %f]\n", entry->base.layer_name_, out[0], out[1], out[entry->base.out_size_-2], out[entry->base.out_size_-1]);
 #endif

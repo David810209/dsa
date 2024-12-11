@@ -16,7 +16,7 @@ SP = $(CCPATH)/$(CROSS)-strip
 GCCVERSION = $(shell $(CC) --version | grep gcc | sed 's/^.* //g')
 
 LIBC = ../elibc
-LIBC_OBJS = $(LIBC)/crt0.o $(LIBC)/stdio.o $(LIBC)/stdlib.o $(LIBC)/string.o $(LIBC)/time.o $(LIBC)/uart.o
+LIBC_OBJS = $(LIBC)/crt0.o $(LIBC)/stdio.o $(LIBC)/stdlib.o $(LIBC)/string.o $(LIBC)/time.o $(LIBC)/uart.o $(LIBC)/math.o
 
 LIB_FILE = ./sdcard
 LIB_FILE_OBJS = $(LIB_FILE)/sd.o $(LIB_FILE)/spi.o $(LIB_FILE)/fat32.o

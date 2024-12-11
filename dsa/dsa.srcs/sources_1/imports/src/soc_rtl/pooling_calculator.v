@@ -3,7 +3,7 @@
 
 `include "aquila_config.vh"
 
-module data_feeder #(
+module pooling_calculator #(
     parameter XLEN = 32
 ) (
     // System signals
@@ -62,7 +62,9 @@ declare MMIO address
 32'hC460_0000 = input data B
 32'hC470_0000 = output data 
 */
-//weight data
+
+
+//---weight data--------------
 reg [4:0] load_weight_cnt;
 reg [XLEN-1:0] total_weight;
 reg [XLEN-1:0] weight_data[24:0];
@@ -90,7 +92,7 @@ always @(posedge clk_i) begin
             load_weight_cnt <= 0;
         end
         else
-        if(we_i && addr_i == 32'hC410_0000 && !written)begin
+        if(we_i && addr_i == 32'hC400_0004 && !written)begin
             weight_data[load_weight_cnt] <= data_i;
             load_weight_cnt <= load_weight_cnt + 1;
             written <= 1;
@@ -100,6 +102,74 @@ always @(posedge clk_i) begin
     end
     end
     
+end
+
+// input image  data
+/*
+ppi=0
+for(int i = 0;i<24;i++){
+for(int j = 0;j < 24;j++){ ppi++;}
+ppi += 4;
+}
+ppi = 676;
+*/
+initial begin
+    for(i = 0; i < 676; i = i + 1)begin
+        i_img[i] = 0;
+    end
+end
+
+reg [9:0] load_i_img_cnt;
+reg [XLEN-1:0] total_i_img;
+reg [XLEN-1:0] i_img[675:0];
+reg i_img_written;
+
+always @(posedge clk_i) begin
+    if(rst_i)begin
+        load_i_img_cnt <= 0;
+        total_i_img <= 0;
+        i_img_written <= 0;
+    end
+    else if(en_i && we_i && addr_i == 32'hC410_0000) begin
+        total_i_img <= data_i;
+        load_i_img_cnt <= 0;
+        i_img_written <= 0;
+    end
+    else if(S == S_LOAD_I_IMG)begin
+        if(load_i_img_cnt == total_i_img)begin
+            load_i_img_cnt <= 0;
+        end
+        else
+        if(we_i && addr_i == 32'hC410_0004 && !i_img_written)begin
+            i_img[load_i_img_cnt] <= data_i;
+            load_i_img_cnt <= load_i_img_cnt + 1;
+            i_img_written <= 1;
+        end
+        else if(!we_i)begin
+        i_img_written <= 0;
+    end
+    end
+    
+end
+
+//output image data
+reg [9:0] load_o_img_cnt;
+reg [XLEN-1:0] total_o_img;
+reg [XLEN-1:0] o_img[575:0];  // 24*24
+reg o_img_written;
+
+always @(posedge clk_i) begin
+    if(rst_i)begin
+        total_o_img <= 0;
+    end
+    else if(en_i && we_i && addr_i == 32'hC420_0000) begin
+        total_o_img <= data_i;
+    end
+    else if(S == S_RESET_O_IMG)begin
+        for(i = 0; i < total_o_img; i = i + 1)begin
+            o_img[i] <= 0;
+        end
+    end
 end
 
 reg data_valid;
@@ -154,110 +224,8 @@ begin
     end
 end
 
-//for FP add
-reg [XLEN-1:0] dataA;
-reg [XLEN-1:0] dataB;
-wire [XLEN-1:0] add_result_data;
-wire add_result_valid;
-reg add_data_valid;
-reg [XLEN-1:0] add_result_reg;
-
-always @(posedge clk_i)
-begin
-    if(rst_i)begin
-        dataA <= 0;
-        dataB <= 0;
-        add_data_valid <= 0;
-    end
-    else if(en_i && we_i)begin
-        if(addr_i == 32'hC430_0000 && !add_data_valid)begin
-            dataA <= result_reg;
-            dataB <= data_i;
-            add_data_valid <= 1;
-        end
-        else if(addr_i == 32'hC430_0014)begin
-            dataA <= data_i;
-        end
-        else if(addr_i == 32'hC430_0018 && !add_data_valid)begin
-            dataB <= data_i;
-            add_data_valid <= 1;
-        end
-    end
-    else if(add_data_valid) begin
-        add_data_valid <= 0;
-    end
-end
-
-//for FP mux
-reg [XLEN-1:0] mux_dataA;
-reg [XLEN-1:0] mux_dataB;
-wire [XLEN-1:0] mux_result_data;
-wire mux_result_valid;
-reg mux_data_valid;
-reg [XLEN-1:0] mux_result_reg;
-
-always @(posedge clk_i)
-begin
-    if(rst_i)begin
-        mux_dataA <= 0;
-        mux_dataB <= 0;
-        mux_data_valid <= 0;
-    end
-    else if(en_i && we_i && addr_i == 32'hC430_0008)begin
-        mux_dataA <= data_i;
-    end
-    else if(en_i && we_i && addr_i == 32'hC430_000c && !mux_data_valid)begin
-        mux_dataB <= data_i;
-        mux_data_valid <= 1;
-    end
-    else if(mux_data_valid) begin
-        mux_data_valid <= 0;
-    end
-end
-
-
-
-reg send;
-always @(posedge clk_i)
-begin
-    if(rst_i)begin
-        result_reg <= 0;
-        add_result_reg <= 0;
-        data_o <= 0;
-        send <= 0;
-    end
-    else if(result_valid)begin
-        result_reg <= fp_result_data;
-        send <= 0;
-    end
-    else if(add_result_valid)begin
-        add_result_reg <= add_result_data;
-        send <= 0;
-    end
-    else if(mux_result_valid)begin
-        mux_result_reg <= mux_result_data;
-        send <= 0;
-    end
-    else if(!we_i && (addr_i == 32'hC430_0004) && send == 0)begin
-            result_reg <= 0;
-            data_o <= add_result_reg;
-            send <= 1;
-    end
-    else if(!we_i && (addr_i == 32'hC430_0010) && send == 0)begin
-            data_o <= mux_result_reg;
-            send <= 1;
-    end
-    else if(!we_i && (addr_i == 32'hC470_0000) && send == 0)begin
-            result_reg <= 0;
-            data_o <= result_reg;
-            send <= 1;
-    end
-end
-
-
-
 reg [2:0] S, S_next;
-localparam S_IDLE = 0, S_LOAD_WEIGHT = 1, S_CALC = 2, S_CALC_ADD = 3, S_CALC_MUX = 4;
+localparam S_IDLE = 3'b00, S_LOAD_WEIGHT = 3'b01, S_CALC = 3'b10, S_LOAD_I_IMG = 3'b11, S_RESET_O_IMG = 3'b100;
 
 always @(posedge clk_i)
 begin
@@ -273,18 +241,28 @@ begin
             if(en_i && we_i && addr_i == 32'hC400_0000)begin
                 S_next = S_LOAD_WEIGHT;
             end
+            else if(en_i && we_i && addr_i == 32'hC410_0000)begin
+                S_next = S_LOAD_I_IMG;
+            end
+            else if(en_i && we_i && addr_i == 32'hC420_0000)begin
+                S_next = S_RESET_O_IMG;
+            end
             else if(data_valid)begin
                 S_next = S_CALC;
-            end
-            else if(add_data_valid)begin
-                S_next = S_CALC_ADD;
-            end
-            else if(mux_data_valid) begin
-                S_next = S_CALC_MUX;
             end
         end
         S_LOAD_WEIGHT:begin
             if(load_weight_cnt == total_weight)begin
+                S_next = S_IDLE;
+            end
+        end
+        S_LOAD_I_IMG:begin
+            if(load_i_img_cnt == total_i_img)begin
+                S_next = S_IDLE;
+            end
+        end
+        S_LOAD_O_IMG:begin
+            if(load_o_img_cnt == total_o_img)begin
                 S_next = S_IDLE;
             end
         end
@@ -293,17 +271,26 @@ begin
                 S_next = S_IDLE;
             end
         end
-        S_CALC_ADD:begin
-            if(add_data_valid)begin
-                S_next = S_IDLE;
-            end
-        end
-        S_CALC_MUX:begin
-            if(mux_data_valid)begin
-                S_next = S_IDLE;
-            end
-        end
     endcase
+end
+
+reg send;
+always @(posedge clk_i)
+begin
+    if(rst_i)begin
+        result_reg <= 0;
+        data_o <= 0;
+        send <= 0;
+    end
+    else if(result_valid)begin
+        result_reg <= fp_result_data;
+        send <= 0;
+    end
+    else if(!we_i && (addr_i == 32'hC430_0000 || addr_i == 32'hC470_0000) && send == 0)begin
+            result_reg <= 0;
+            data_o <= result_reg;
+            send <= 1;
+    end
 end
 
 assign ready_o = 1;
@@ -322,26 +309,5 @@ floating_point_0 floating_point_0(
     .m_axis_result_tdata(fp_result_data)
 );
 
-
-FP_ADD fp_add(
-    .s_axis_a_tvalid(add_data_valid),
-    .s_axis_a_tdata(dataA),
-    .s_axis_b_tvalid(add_data_valid),
-    .s_axis_b_tdata(dataB),
-
-    .m_axis_result_tvalid(add_result_valid),
-    .m_axis_result_tdata(add_result_data)
-);
-
-FP_MUX fpmux(
-    .aclk(clk_i),
-    .s_axis_a_tvalid(mux_data_valid),
-    .s_axis_a_tdata(mux_dataA),
-    .s_axis_b_tvalid(mux_data_valid),
-    .s_axis_b_tdata(mux_dataB),
-
-    .m_axis_result_tvalid(mux_result_valid),
-    .m_axis_result_tdata(mux_result_data)
-);
 
 endmodule

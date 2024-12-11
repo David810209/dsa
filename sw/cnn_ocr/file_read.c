@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
 
 #include "fat32.h"
 #include "file_read.h"
@@ -93,21 +94,88 @@ uint8_t *read_labels(char *filename)
     return labels;
 }
 
+// void quantize_weights(float *weights, int8_t *q_weights, int num_weights, float scale)
+// {
+//     for (int i = 0; i < num_weights; i++)
+//     {
+//         q_weights[i] = (int8_t)roundf(weights[i] / scale);
+//         if (q_weights[i] > 127) q_weights[i] = 127;       // 上限截斷
+//         if (q_weights[i] < -128) q_weights[i] = -128;     // 下限截斷
+//     }
+// }
+
+// // 計算 L2 範數誤差和 MSE
+// void compute_quantization_error(float *weights, int8_t *q_weights, int num_weights, float scale)
+// {
+//     float l2_error = 0.0f, mse = 0.0f;
+//     float mae = 0.0f;
+//     for (int i = 0; i < num_weights; i++)
+//     {
+//         float restored = q_weights[i] * scale; // 還原到浮點數
+//         float diff = weights[i] - restored;    // 計算誤差
+//         l2_error += diff * diff;
+//         mae += fabsf(diff);
+//         mse += diff * diff;
+//     }
+//     l2_error = sqrtf(l2_error);
+//     mse /= num_weights;
+//     mae /= num_weights;
+
+//     printf("L2 Error: %f\n", l2_error);
+//     printf("MSE: %f\n", mse);
+//     printf("MAE: %f\n", mae);
+// }
+
 float_t *read_weights(char *filename)
 {
     int size;
     float_t *weights;
 
+    // 讀取檔案並取得總 byte 數
     size = read_file(filename, fbuf);
-    // if ((weights = (float_t *) malloc(size)) == NULL)
-    if ((weights = (float_t *) tcm_malloc(size)) == NULL)
+    // int num_weights = size / sizeof(float_t); // 計算浮點數的個數
+
+    if ((weights = (float_t *)tcm_malloc(size)) == NULL)
     {
         printf("read_weights(): Out of memory.\n");
-        exit (1);
+        exit(1);
     }
-    printf("read_weights(): size = %d\n", size);
-    // weights = (float_t *)0x00001000;
-    memcpy((void *) weights, (void *) fbuf, size);
-    return (float_t *) weights;
+    // printf("read_weights(): size = %d bytes, num_weights = %d\n", size, num_weights);
+    memcpy((void *)weights, (void *)fbuf, size);
+
+    // 計算量化比例 (scale)
+    // float max_val = 0.0f;
+    // for (int i = 0; i < num_weights; i++)
+    // {
+    //     if (fabsf(weights[i]) > max_val)
+    //         max_val = fabsf(weights[i]);
+    // }
+    // float scale = max_val / 127.0f;
+
+    // // 分配記憶體並量化權重
+    // int8_t *q_weights = (int8_t *)malloc(num_weights * sizeof(int8_t));
+    // if (!q_weights)
+    // {
+    //     printf("Failed to allocate memory for quantized weights.\n");
+    //     free(weights);
+    //     exit(1);
+    // }
+
+    // quantize_weights(weights, q_weights, num_weights, scale);
+
+    // // 計算量化誤差
+    // compute_quantization_error(weights, q_weights, num_weights, scale);
+    // printf("Quantization Scale: %f\n", scale);
+
+    // // 清理記憶體
+    // free(q_weights);
+    return weights;
 }
 
+/*
+read_weights(): size = 30560 bytes, num_weights = 7640
+L2 Error: 8.580088
+MSE: 0.009636
+MAE: 0.052817
+Quantization Scale: 0.006118
+*/

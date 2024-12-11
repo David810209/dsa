@@ -145,29 +145,39 @@ void conv_copy_and_pad_input(convolutional_layer *entry, input_struct *input)
 
 void conv_3d(uint64_t o, convolutional_layer *entry, float_t *pa)
 {
+    
     float_t *W = entry->base._W;
     float_t *in = entry->base.padded_ptr;
     index3d in_ = entry->in_;
     index3d out_ = entry->out_;
-    index3d in_padded_ = entry->in_padded_;
     index3d weight_ = entry->weight_;
-    uint64_t h_stride_ = entry->h_stride_;
-    uint64_t w_stride_ = entry->w_stride_;
-    const uint64_t const1 = in_padded_.width_ - weight_.width_;
-    const uint64_t const2 = h_stride_ * in_padded_.width_ - out_.width_ * w_stride_;
+    const uint64_t const1 = in_.width_ - weight_.width_;
+    const uint64_t const2 = in_.width_ - out_.width_;
 
     for (uint64_t inc = 0; inc < in_.depth_; inc++) {
         const float_t *pw = &W[get_index(&weight_, 0, 0, in_.depth_ * o + inc)];
 
         // Convert repeatedly calculated numbers to constants.
-        float_t * ppi = &in[get_index(&in_padded_, 0, 0, inc)];
+        //load image into register
+        float_t * ppi = &in[get_index(&in_, 0, 0, inc)];
         uint64_t idx = 0;
+        // 計算*ppi最遠的位置
+        // uint64_t input_image_size = (out_.width_ + const2) * out_.height_;
+        // *((int volatile *)0xC4100000) = input_image_size;
+        // for(int i = 0;i < input_image_size; i++)
+        // {
+        //     *((float volatile *)0xC4100004) = *ppi++;
+        // }
         const uint64_t inner_loop_iter = weight_.height_ * weight_.width_;
+        // load weight into register
         *((int volatile *)0xC4000000) = inner_loop_iter; // trigger load weight.
         const float_t * ppw = pw;
-        for(int i = 0; i < inner_loop_iter; i++){
+        for(int i = 0; i < 25; i++){
             *((float volatile *)0xC4100000) = *ppw++;
         }
+        //initialize register
+        // *((float volatile *)0xC4300000) = out_.height_;
+
         for (uint64_t y = 0; y < out_.height_; y++) {
             for (uint64_t x = 0; x < out_.width_; x++) {
                 // const float_t * ppw = pw;
@@ -185,40 +195,29 @@ void conv_3d(uint64_t o, convolutional_layer *entry, float_t *pa)
                         widx += const1;
                     }
                 }
-                pa[idx++] += *((float volatile *)0xC4300000);
-                ppi += w_stride_;
+                *((float volatile *)0xC4300000) = pa[idx]; 
+                pa[idx] = *((float volatile *)0xC4300004);
+                // pa[idx] += *((float volatile *)0xC4700000);
+                idx++;
+                // ppi += w_stride_;
+                ppi++;
             }
             ppi += const2;
         }
     }
+    
 }
 
 void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct *input)
 {
+    // clock_t tick,ticks_per_msec = CLOCKS_PER_SEC/1000;
+    // tick = clock();
     convolutional_layer *entry = get_convolutional_layer_entry(ptr);
     if (input->in_size_ != entry->base.in_size_)
     {
         printf("Error input size not match %lu/%lu\n", input->in_size_, entry->base.in_size_);
         exit(-1);
     }
-    // float_t *tcm_in =NULL;
-    // if((uintptr_t)input->in_ptr_ >= 0x80000000){
-    //     // printf("input->in_ptr_ is in DDR\n");
-    //     tcm_in = (float_t *)tcm_malloc(entry->base.in_size_ * sizeof(float_t));
-    //     memcpy(tcm_in, input->in_ptr_, entry->base.in_size_ * sizeof(float_t));
-    //     input->in_ptr_ = tcm_in;
-    // }
-    // float_t *prev_feature_map =NULL;
-    // // if((uintptr_t)input->in_ptr_ >= 0x80000000){
-    // if(1){
-    //     prev_feature_map = (float_t *)tcm_malloc(entry->base.in_size_ * sizeof(float_t));
-    //     if (!prev_feature_map) {
-    //         printf("Error: TCM allocation failed for previous feature map.\n");
-    //         exit(-1);
-    //     }
-    //     memcpy(prev_feature_map, input->in_ptr_, entry->base.in_size_ * sizeof(float_t));
-    //     input->in_ptr_ = prev_feature_map;
-    // }
     conv_copy_and_pad_input(entry, input);
 
     float_t *a = entry->base.a_ptr_;
@@ -234,7 +233,8 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
     {
         float_t *pa = &a[get_index(&out_, 0, 0, o)];
         memset((void*)pa, 0, out_dim *sizeof(float_t));
-
+        //trigger register reset zero
+        *((float volatile *)0xC4200000) = out_.width_ * out_.height_;
         conv_3d(o, entry, pa);
 
         if (entry->has_bias_) {
@@ -250,7 +250,8 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
     // if(tcm_in) tcm_free(tcm_in);
     
 
-    
+    // tick  = (clock() - tick)/ticks_per_msec;
+    // conv += tick;
 #ifdef PRINT_LAYER
     printf("[%s] done [%f, %f, ... , %f, %f]\n", entry->base.layer_name_, out[0], out[1], out[entry->base.out_size_-2], out[entry->base.out_size_-1]);
 #endif

@@ -31,6 +31,7 @@
 #include "average_pooling_layer.h"
 #include "fully_connected_layer.h"
 #include "file_read.h"
+// #include "util.h"
 
 int cnn_evaluate(network *nn, float_t *image, int image_size)
 {
@@ -60,6 +61,11 @@ int cnn_evaluate(network *nn, float_t *image, int image_size)
 
 int main()
 {
+    // float_t *weightss = read_weights("weights.dat");
+    // exit(0);
+    // pooling = 0;
+    // conv = 0;
+    // fully = 0;
     network *nn;
     cnn_controller ctrl;
     int n_images, n_rows, n_cols;
@@ -104,6 +110,9 @@ int main()
     printf("tested %d images. The accuracy is %.2f%%\n\n",
         n_images, 100.0f * (float) correct_count / n_images);
     printf("It took %ld msec to perform the test.\n\n", tick);
+    // printf("The spend time for pooling is %ld msec\n", pooling);
+    // printf("The spend time for convolution is %ld msec\n", conv);
+    // printf("The spend time for fully connected is %ld msec\n", fully);
 
     // Free all allocated memory blocks.
     free_network(nn);

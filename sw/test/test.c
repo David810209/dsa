@@ -17,33 +17,23 @@ int main()
                    11, 12, 13, 14, 15,
                    16, 17, 18, 19, 20,
                    21, 22, 23, 24, 25};
+    float test = 0;
+    for(int j = 0;j < 2;j++){
+        for(int i = 0; i < 25; i++){
+            *(float volatile *)0xC4200000 = b[i];
+        }
+        *(float volatile *)0xC4300000 = test;
+        test = *(float volatile *)0xC4300004;
+        // printf("Test: %f\n", test);
+    }
     
-    for(int i = 0; i < 25; i++){
-        *(float volatile *)0xC4200000 = b[i];
-    }
-
-    float test = *(float volatile *)0xC4300000;
     float ans = 0;
-    for(int i = 0; i < 25; i++){
-        ans += a[i] * b[i];
-        a[i]++;
-        b[i]+=2;
+    for(int j = 0;j < 2;j++){
+        for(int i = 0; i < 25; i++){
+            ans += a[i] * b[i];
+        }
     }
     printf("Test: %f, Ans: %f\n", test, ans);
 
-    *(int volatile *)0xC4000000 = 25;
-    for(int i = 0; i < 25; i++){
-        *(float volatile *)0xC4100000 = a[i];
-    }
-
-    for(int i = 0; i < 25; i++){
-        *(float volatile *)0xC4200000 = b[i];
-    }
-    test = *(float volatile *)0xC4300000;
-    ans = 0;
-    for(int i = 0; i < 25; i++){
-        ans += a[i] * b[i];
-    }
-    printf("Test: %f, Ans: %f\n", test, ans);
     return 0;
 }
