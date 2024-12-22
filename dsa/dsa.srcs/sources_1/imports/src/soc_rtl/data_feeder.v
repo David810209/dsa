@@ -79,7 +79,7 @@ declare MMIO address
 /////////////////////////////////////////////////
 reg [4:0] load_weight_cnt;
 reg [4:0] total_weight;
-reg [XLEN-1:0] weight_data[24:0];
+(* ram_style="block" *) reg [XLEN-1:0] weight_data[1023:0];
 reg written;
 
 always @(posedge clk_i) begin
@@ -124,7 +124,7 @@ ppi = 676;
 
 reg [9:0] load_i_img_cnt;
 reg [XLEN-1:0] total_i_img;
-reg [XLEN-1:0] i_img[783:0];
+(* ram_style="block" *) reg [XLEN-1:0] i_img[1023:0];
 reg i_img_written;
 
 always @(posedge clk_i) begin
@@ -159,7 +159,7 @@ end
 //output image data
 /////////////////////////////////////////////////
 reg [XLEN-1:0] total_o_img;
-reg [XLEN-1:0] o_img[575:0];  // 24*24
+(* ram_style="block" *)  reg [XLEN-1:0] o_img[2047:0];  // 24*24
 reg [9:0] output_img_cnt;
 
 reg [XLEN-1:0] dataA2;
@@ -171,15 +171,30 @@ reg add_data_valid2;
 
 integer j;
 reg [9:0] out_idx;
+reg start_to_clean;
+reg [9:0] clean_cnt;
 always @(posedge clk_i) begin
     if(rst_i)begin
         total_o_img <= 0;
         out_idx <= 0;
+        dataA2 <= 0;
+        dataB2 <= 0;
+        add_data_valid2 <= 0;
+        start_to_clean <= 0;
+        clean_cnt <= 0;
     end
     else if(en_i && we_i && addr_i == 32'hC420_0000) begin
         total_o_img <= data_i;
-        for(j = 0; j < 576; j = j + 1)begin
-            o_img[j] <= 0;
+        start_to_clean <= 1;
+        clean_cnt <= 0 ;
+    end
+    else if(start_to_clean)begin
+        if(clean_cnt == total_o_img)begin
+            start_to_clean <= 0;
+        end
+        else begin 
+            o_img[clean_cnt] <= 0;
+            clean_cnt <= clean_cnt + 1;
         end
     end
     else if(trigger_calc)begin
@@ -564,7 +579,7 @@ begin
     endcase
 end
 
-assign ready_o = 1;
+assign ready_o = ~start_to_clean;
 
 
 ////////////////////////////////////////////
@@ -603,6 +618,7 @@ floating_point_0 fma(
 
 // FP ADD IP
 FP_ADD fp_add(
+    .aclk(clk_i),
     .s_axis_a_tvalid(add_data_valid),
     .s_axis_a_tdata(dataA),
     .s_axis_b_tvalid(add_data_valid),
@@ -614,6 +630,7 @@ FP_ADD fp_add(
 
 // FP ADD IP
 FP_ADD fp_add2(
+    .aclk(clk_i),
     .s_axis_a_tvalid(add_data_valid2),
     .s_axis_a_tdata(dataA2),
     .s_axis_b_tvalid(add_data_valid2),
@@ -624,7 +641,7 @@ FP_ADD fp_add2(
 );
 
 //FP MULTIPLY IP
-FP_MUX fpmux(
+FP_MUL fpmul(
     .aclk(clk_i),
     .s_axis_a_tvalid(mul_data_valid),
     .s_axis_a_tdata(mul_dataA),

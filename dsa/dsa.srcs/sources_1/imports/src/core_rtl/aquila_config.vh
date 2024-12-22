@@ -93,4 +93,4 @@
 `define NOP 32'h00000013
 
 // SIM_FNAME defines the RISC-V program path of an ELF file for simulation.
-`define SIM_FNAME "c://zichen//dsa//sw//test//test.elf"
+`define SIM_FNAME "/home/zichen/zichen/dsa/sw/test/test.elf"

@@ -66,7 +66,7 @@ module sram
     output reg [DATA_WIDTH-1: 0]    data_o
 );
 
-reg [DATA_WIDTH-1 : 0] RAM [N_ENTRIES-1: 0];
+(* ram_style="block" *) reg [DATA_WIDTH-1 : 0] RAM [N_ENTRIES-1: 0];
 
 always @(posedge clk_i)
 begin
