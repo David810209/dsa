@@ -1,13 +1,13 @@
 {
   "schema": "xilinx.com:schema:json_instance:1.0",
   "ip_inst": {
-    "xci_name": "floating_point_0",
+    "xci_name": "FP_FMA",
     "component_reference": "xilinx.com:ip:floating_point:7.1",
     "ip_revision": "18",
-    "gen_directory": "../../../../dsa.gen/sources_1/ip/floating_point_0",
+    "gen_directory": "../../../../dsa.gen/sources_1/ip/FP_FMA",
     "parameters": {
       "component_parameters": {
-        "Component_Name": [ { "value": "floating_point_0", "resolve_type": "user", "usage": "all" } ],
+        "Component_Name": [ { "value": "FP_FMA", "resolve_type": "user", "usage": "all" } ],
         "Operation_Type": [ { "value": "FMA", "value_src": "user", "resolve_type": "user", "usage": "all" } ],
         "Add_Sub_Value": [ { "value": "Add", "value_src": "user", "resolve_type": "user", "usage": "all" } ],
         "C_Compare_Operation": [ { "value": "Programmable", "resolve_type": "user", "usage": "all" } ],
@@ -148,7 +148,7 @@
         "IPCONTEXT": [ { "value": "IP_Flow" } ],
         "IPREVISION": [ { "value": "18" } ],
         "MANAGED": [ { "value": "TRUE" } ],
-        "OUTPUTDIR": [ { "value": "../../../../dsa.gen/sources_1/ip/floating_point_0" } ],
+        "OUTPUTDIR": [ { "value": "../../../../dsa.gen/sources_1/ip/FP_FMA" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],
         "SHAREDDIR": [ { "value": "." } ],
         "SWVERSION": [ { "value": "2024.1" } ],

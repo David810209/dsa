@@ -75,7 +75,7 @@ module sram_dp
     output reg                    ready2_o
 );
 
-(* ram_style="block" *) reg [DATA_WIDTH-1 : 0] RAM [N_ENTRIES-1 : 0];
+reg [DATA_WIDTH-1 : 0] RAM [N_ENTRIES-1 : 0];
 
 initial
 begin

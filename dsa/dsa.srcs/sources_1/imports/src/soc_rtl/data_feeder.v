@@ -56,6 +56,8 @@ declare MMIO address
 32'hC430_0004 = out_.width
 32'hC430_0008 = weight_width
 32'hC430_000c = trigger calculation & check calculation done
+32'hc430_0010 = in_.depth
+32'hc430_0014 = out_.depth
 
 //-- simple calculation(for other layer)---
 //ADD (pooling layer)
@@ -77,9 +79,23 @@ declare MMIO address
 ////////////////////////////////////////////
 //load weight data
 /////////////////////////////////////////////////
-reg [4:0] load_weight_cnt;
-reg [4:0] total_weight;
-(* ram_style="block" *) reg [XLEN-1:0] weight_data[1023:0];
+reg ready_reg;
+reg ready_w_reg;
+always @(posedge clk_i)begin
+    if(rst_i)begin
+        ready_w_reg <= 0;
+    end
+    else if(en_i && we_i )begin
+        ready_w_reg <= 1;
+    end
+    else if(ready_w_reg)begin
+        ready_w_reg <= 0;
+    end
+end
+reg [15:0] load_weight_cnt;
+reg [15:0] total_weight;
+reg [15:0] inner_weight_num;
+(* ram_style="block" *) reg [XLEN-1:0] weight_data[4095:0];
 reg written;
 
 always @(posedge clk_i) begin
@@ -87,9 +103,12 @@ always @(posedge clk_i) begin
         load_weight_cnt <= 0;
         total_weight <= 0;
         written <= 0;
+
+        inner_weight_num <= 0;
     end
     else if(en_i && we_i && addr_i == 32'hC400_0000) begin
-        total_weight <= weight_width * weight_width;
+        total_weight <= data_i;
+        inner_weight_num <= weight_width * weight_width;
         load_weight_cnt <= 0;
         written <= 0;
     end
@@ -122,8 +141,8 @@ ppi += 4;
 ppi = 676;
 */
 
-reg [9:0] load_i_img_cnt;
-reg [XLEN-1:0] total_i_img;
+reg [15:0] load_i_img_cnt;
+reg [15:0] total_i_img;
 (* ram_style="block" *) reg [XLEN-1:0] i_img[1023:0];
 reg i_img_written;
 
@@ -134,7 +153,7 @@ always @(posedge clk_i) begin
         i_img_written <= 0;
     end
     else if(en_i && we_i && addr_i == 32'hC410_0000) begin
-        total_i_img <= in_width * in_width;
+        total_i_img <= data_i;
         load_i_img_cnt <= 0;
         i_img_written <= 0;
     end
@@ -158,9 +177,9 @@ end
 ////////////////////////////////////////////
 //output image data
 /////////////////////////////////////////////////
-reg [XLEN-1:0] total_o_img;
+reg [15:0] total_o_img;
 (* ram_style="block" *)  reg [XLEN-1:0] o_img[2047:0];  // 24*24
-reg [9:0] output_img_cnt;
+reg [15:0] output_img_cnt;
 
 reg [XLEN-1:0] dataA2;
 reg [XLEN-1:0] dataB2;
@@ -170,9 +189,10 @@ reg add_data_valid2;
 
 
 integer j;
-reg [9:0] out_idx;
+reg [15:0] out_idx;
 reg start_to_clean;
-reg [9:0] clean_cnt;
+reg clean_done;
+reg [15:0] clean_cnt;
 always @(posedge clk_i) begin
     if(rst_i)begin
         total_o_img <= 0;
@@ -182,6 +202,7 @@ always @(posedge clk_i) begin
         add_data_valid2 <= 0;
         start_to_clean <= 0;
         clean_cnt <= 0;
+        clean_done <= 0;
     end
     else if(en_i && we_i && addr_i == 32'hC420_0000) begin
         total_o_img <= data_i;
@@ -191,6 +212,7 @@ always @(posedge clk_i) begin
     else if(start_to_clean)begin
         if(clean_cnt == total_o_img)begin
             start_to_clean <= 0;
+            clean_done <= 1;
         end
         else begin 
             o_img[clean_cnt] <= 0;
@@ -199,6 +221,9 @@ always @(posedge clk_i) begin
     end
     else if(trigger_calc)begin
         out_idx <= 0;
+    end
+    else if(change_out_idx) begin
+        out_idx <= out_channel_idx * out_width * out_width;
     end
     else if(C == C_STORE_RESULT && fma_result_valid)begin
         dataA2 <= o_img[out_idx];
@@ -210,21 +235,30 @@ always @(posedge clk_i) begin
         add_data_valid2 <= 0;
         out_idx <= out_idx + 1;
     end
+     if(clean_done)begin
+        clean_done <= 0;
+    end
 end
 
 ////////////////////////////////////////////
 //conv 3d calculation
 /////////////////////////////////////////////////
-reg [4:0] out_width;
-reg [4:0] in_width;
-reg [4:0] weight_width;
-wire [4:0] const1 = in_width - weight_width;
-wire [4:0] const2 = in_width - out_width;
-reg [4:0] idx_x, idx_y;
-reg [9:0] img_idx;
-wire this_calc_done = fma_data_valid && (fma_calculation_cnt == 25);
+reg [15:0] in_channel_idx;
+reg [15:0] out_channel_idx;
+reg [15:0] out_width;
+reg [15:0] in_width;
+reg [15:0] weight_width;
+reg [15:0] in_depth;
+reg [15:0] out_depth;
+wire [15:0] const1 = in_width - weight_width;
+wire [15:0] const2 = in_width - out_width;
+reg [15:0] idx_x, idx_y;
+reg [15:0] img_idx;
+wire this_calc_done = fma_data_valid && (inner_cnt == 25);
+wire next_weight = (inner_cnt == 24) && fma_result_valid && idx_x == out_width - 1 && idx_y == out_width - 1;
 wire inner_loop_done = idx_x == out_width - 1 ;
 wire trigger_calc = en_i && we_i && addr_i == 32'hC430_000c;
+wire trigger_next_calc =  (idx_x == 0 && idx_y == out_width && add_result_valid2) && (out_channel_idx != out_depth) ;
 
 always @(posedge clk_i) begin
     if(rst_i)begin
@@ -241,7 +275,13 @@ always @(posedge clk_i) begin
     else if(en_i && we_i && addr_i == 32'hC430_0008) begin
         weight_width <= data_i;
     end
-    else if(trigger_calc) begin
+    else if(en_i && we_i && addr_i == 32'hC430_0010) begin
+        in_depth <= data_i;
+    end
+    else if(en_i && we_i && addr_i == 32'hC430_0014) begin
+        out_depth <= data_i;
+    end
+    else if(trigger_calc || trigger_next_calc || C == C_IDLE) begin
         idx_x <= 0;
         idx_y <= 0;
     end
@@ -260,9 +300,10 @@ reg [XLEN-1:0] fma_dataA;
 reg [XLEN-1:0] fma_dataB;
 reg [XLEN-1:0] fma_dataC;
 wire [XLEN-1:0] fma_result_data;
-reg [4:0] fma_calculation_cnt;
-reg [2:0] window_counter;
-reg [6:0] widx;
+reg [15:0] fma_calculation_cnt;
+reg [15:0] inner_cnt;
+reg [15:0] window_counter;
+reg [15:0] widx;
 always @(posedge clk_i)
 begin
     if(rst_i)begin
@@ -271,24 +312,50 @@ begin
         fma_dataC <= 0;
         fma_data_valid <= 0;
         fma_calculation_cnt <= 0;
+        inner_cnt <= 0;
         window_counter <= 0;
         img_idx <= 0;
         widx <= 0;
+        in_channel_idx <= 0;
+        out_channel_idx <= 0;
     end
     else begin
-        if(fma_calculation_cnt == total_weight)begin
+        if(C == C_IDLE)begin
+            in_channel_idx <= 0;
+            out_channel_idx <= 0;
             fma_calculation_cnt <= 0;
+            inner_cnt <= 0;
         end
-        else if((C_next == C_CALC && fma_result_valid)|| trigger_calc || (C == C_STORE_RESULT && C_next == C_CALC))begin
-            fma_dataA <= weight_data[fma_calculation_cnt];
+        else if(out_channel_idx == out_depth)begin
+            out_channel_idx <= out_channel_idx;
+        end
+        else if(in_channel_idx == in_depth)begin
+            in_channel_idx <= 0;
+            out_channel_idx <= out_channel_idx + 1;
+        end
+        else if(inner_cnt == inner_weight_num)begin
+            inner_cnt <= 0;
+        end
+        if((C_next == C_CALC && fma_result_valid)|| trigger_calc ||trigger_next_calc || (C == C_STORE_RESULT && C_next == C_CALC))begin
+            fma_dataA <= weight_data[fma_calculation_cnt + inner_cnt];
             fma_dataB <= i_img[img_idx + widx];
-            fma_dataC <= (C == C_STORE_RESULT || trigger_calc) ? 0 : fma_result_data;
+            fma_dataC <= (C == C_STORE_RESULT || trigger_calc || trigger_next_calc) ? 0 : fma_result_data;
             fma_data_valid <= 1;
-            fma_calculation_cnt <= fma_calculation_cnt + 1;
+            inner_cnt <= inner_cnt + 1;
             if(trigger_calc)begin
                 widx <= 1;
                 window_counter <= 1;
                 img_idx <= 0;
+                inner_cnt <= 1;
+                fma_calculation_cnt <= 0;
+            end
+            else if(next_weight) begin
+                if(in_channel_idx == in_depth - 1) img_idx <= const2 * -1 - 1;
+                else img_idx <= img_idx + widx - const2;
+                widx <= 1;
+                window_counter <= 1;
+                in_channel_idx <= in_channel_idx + 1;
+                fma_calculation_cnt <= fma_calculation_cnt + 25;
             end
             else if(window_counter == weight_width-1)begin
                 window_counter <= 0;
@@ -315,6 +382,12 @@ begin
     end
 end
 
+reg change_out_idx;
+always @(posedge clk_i) begin
+    if(rst_i) change_out_idx <= 0;
+    else if(trigger_next_calc) change_out_idx <= 1;
+    else if(change_out_idx == 1) change_out_idx <= 0;
+end
 
 ////////////////////////////////////////////
 //for FMA data feeding
@@ -326,7 +399,7 @@ reg [XLEN-1:0] feeder_dataB;
 reg [XLEN-1:0] feeder_dataC;
 wire [XLEN-1:0] fp_result_data;
 reg [XLEN-1:0] result_reg;
-reg [4:0] calculation_cnt;
+reg [15:0] calculation_cnt;
 
 always @(posedge clk_i)
 begin
@@ -426,6 +499,7 @@ always @(posedge clk_i)
 begin
     if(rst_i)begin
         result_reg <= 0;
+        ready_reg <= 0;
         add_result_reg <= 0;
         data_o <= 0;
         send <= 0;
@@ -436,6 +510,7 @@ begin
     end
     else if(en_i &&  !we_i && (addr_i == 32'hC420_0004 && send == 0))begin
             data_o <= o_img[output_img_cnt];
+            ready_reg <= 1;
             if(output_img_cnt == total_o_img)begin
                 output_img_cnt <= 0;
             end
@@ -446,34 +521,41 @@ begin
     end
     else if(en_i && !we_i && addr_i == 32'hC430_000c)begin
         data_o <= C == C_IDLE;
-    end
-    else if(result_valid)begin
-        result_reg <= fp_result_data;
-        send <= 0;
-    end
-    else if(add_result_valid)begin
-        add_result_reg <= add_result_data;
-        send <= 0;
-    end
-    else if(mul_result_valid)begin
-        mul_result_reg <= mul_result_data;
-        send <= 0;
+        ready_reg <= 1;
     end
     else if(en_i &&  !we_i && (addr_i == 32'hC440_0008) && send == 0)begin
             result_reg <= 0;
-            data_o <= add_result_reg;
+            data_o <= add_result_valid ? add_result_data :  add_result_reg;
             send <= 1;
+            ready_reg <= 1;
     end
     else if(en_i &&  !we_i && (addr_i == 32'hC440_0014) && send == 0)begin
             data_o <= mul_result_reg;
+            ready_reg <= 1;
             send <= 1;
     end
     else if(en_i &&  !we_i && (addr_i == 32'hC440_0020) && send == 0)begin
             result_reg <= 0;
             data_o <= result_reg;
+            ready_reg <= 1;
             send <= 1;
     end
     else if(send)begin
+        send <= 0;
+    end
+    if(ready_reg)begin
+        ready_reg <= 0;
+    end
+    if(result_valid)begin
+        result_reg <= fp_result_data;
+        send <= 0;
+    end
+    if(add_result_valid)begin
+        add_result_reg <= add_result_data;
+        send <= 0;
+    end
+    if(mul_result_valid)begin
+        mul_result_reg <= mul_result_data;
         send <= 0;
     end
 end
@@ -568,7 +650,7 @@ begin
             end
         end
         C_STORE_RESULT:begin
-            if(idx_x == 0 && idx_y == out_width && add_result_valid2)begin
+            if(out_channel_idx == out_depth && in_channel_idx == 0 && add_result_valid2)begin
                 C_next = C_IDLE;
             end
             else if(add_result_valid2)begin
@@ -579,14 +661,14 @@ begin
     endcase
 end
 
+// assign ready_o = (~start_to_clean) && (ready_reg || ready_w_reg || clean_done);
 assign ready_o = ~start_to_clean;
-
 
 ////////////////////////////////////////////
 //fIP Management
 /////////////////////////////////////////////////
 // FMA IP
-floating_point_0 floating_point_0(
+FP_FMA floating_point_0(
     .aclk(clk_i),
     .s_axis_a_tvalid(data_valid),
     .s_axis_a_tdata(feeder_dataA),
@@ -601,7 +683,7 @@ floating_point_0 floating_point_0(
     .m_axis_result_tdata(fp_result_data)
 );
 
-floating_point_0 fma(
+FP_FMA fma(
     .aclk(clk_i),
     .s_axis_a_tvalid(fma_data_valid),
     .s_axis_a_tdata(fma_dataA),

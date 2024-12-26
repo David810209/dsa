@@ -79,7 +79,7 @@ declare MMIO address
 /////////////////////////////////////////////////
 reg [4:0] load_weight_cnt;
 reg [4:0] total_weight;
-(* ram_style="block" *)  reg [XLEN-1:0] weight_data[1023:0];
+(* ram_style="block" *) reg [XLEN-1:0] weight_data[1023:0];
 reg written;
 
 always @(posedge clk_i) begin
@@ -159,18 +159,7 @@ end
 //output image data
 /////////////////////////////////////////////////
 reg [XLEN-1:0] total_o_img;
-(* ram_style="block" *) reg [XLEN-1:0] o_img[2047:0];  // 8*8*32
-wire [10:0] o_img_raddr = (C == C_STORE_RESULT && fma_result_valid) ? out_idx : output_img_cnt; 
-wire [10:0] o_img_waddr = (C == C_STORE_RESULT && add_result_valid2) ? out_idx : clean_cnt;
-wire o_img_ren = (C == C_STORE_RESULT && fma_result_valid) || (en_i &&  !we_i && (addr_i == 32'hC420_0004 && send == 0));
-wire o_img_wen = (start_to_clean && clean_cnt != total_o_img) || (C == C_STORE_RESULT && add_result_valid2);
-wire [XLEN-1:0] o_img_rdata = o_img[o_img_raddr];
-wire [XLEN-1:0] o_img_wdata =  (C == C_STORE_RESULT && add_result_valid2) ? add_result_data2 : 0;
-always @(posedge clk_i)begin
-    if(o_img_wen) begin
-        o_img[o_img_waddr] <= o_img_wdata;
-    end
-end
+(* ram_style="block" *)  reg [XLEN-1:0] o_img[2047:0];  // 24*24
 reg [9:0] output_img_cnt;
 
 reg [XLEN-1:0] dataA2;
@@ -181,11 +170,6 @@ reg add_data_valid2;
 
 
 integer j;
-// initial begin
-//     for(j = 0; j < 576; j = j + 1)begin
-//             o_img[j] <= 0;
-//         end
-// end
 reg [9:0] out_idx;
 reg start_to_clean;
 reg [9:0] clean_cnt;
@@ -199,31 +183,30 @@ always @(posedge clk_i) begin
         start_to_clean <= 0;
         clean_cnt <= 0;
     end
-    else if((en_i && we_i && addr_i == 32'hC420_0000 )) begin
+    else if(en_i && we_i && addr_i == 32'hC420_0000) begin
+        total_o_img <= data_i;
         start_to_clean <= 1;
         clean_cnt <= 0 ;
-        total_o_img <= data_i;
     end
     else if(start_to_clean)begin
         if(clean_cnt == total_o_img)begin
             start_to_clean <= 0;
         end
         else begin 
-            // o_img[clean_cnt] <= 0;
+            o_img[clean_cnt] <= 0;
             clean_cnt <= clean_cnt + 1;
         end
     end
     else if(trigger_calc)begin
         out_idx <= 0;
     end
-    if(C == C_STORE_RESULT && fma_result_valid)begin
-        // dataA2 <= o_img[out_idx];
-        dataA2 <= o_img_rdata;
+    else if(C == C_STORE_RESULT && fma_result_valid)begin
+        dataA2 <= o_img[out_idx];
         dataB2 <= fma_result_data;
         add_data_valid2 <= 1;
     end
     else if(C == C_STORE_RESULT && add_result_valid2)begin
-        // o_img[out_idx] <= add_result_data2;
+        o_img[out_idx] <= add_result_data2;
         add_data_valid2 <= 0;
         out_idx <= out_idx + 1;
     end
@@ -452,8 +435,7 @@ begin
         output_img_cnt <= 0;
     end
     else if(en_i &&  !we_i && (addr_i == 32'hC420_0004 && send == 0))begin
-            // data_o <= o_img[output_img_cnt];
-            data_o <= o_img_rdata;
+            data_o <= o_img[output_img_cnt];
             if(output_img_cnt == total_o_img)begin
                 output_img_cnt <= 0;
             end
@@ -597,7 +579,7 @@ begin
     endcase
 end
 
-assign ready_o = 1;
+assign ready_o = ~start_to_clean;
 
 
 ////////////////////////////////////////////

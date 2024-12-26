@@ -61,7 +61,6 @@
 #include "list.h"
 #include "util.h"
 #include "activation_function.h"
-// #include <time.h>
 
 typedef struct _average_pooling_layer
 {
@@ -80,16 +79,12 @@ average_pooling_layer * get_average_pooling_layer_entry(struct list_node *ptr)
 
 void average_pooling_layer_forward_propagation(struct list_node *ptr, input_struct *input)
 {
-    // clock_t tick,ticks_per_msec = CLOCKS_PER_SEC/1000;
-    // tick = clock();
     average_pooling_layer *entry = get_average_pooling_layer_entry(ptr);
     if (input->in_size_ != entry->base.in_size_)
     {
         printf("Error input size not match %lu/%lu\n", input->in_size_, entry->base.in_size_);
         exit(-1);
     }
-    // printf("input->in_ptr_ address = %x\n", input->in_ptr_);
-    // printf("entry->base.a_ptr_ address = %x\n", entry->base.a_ptr_);
     float_t *in = input->in_ptr_;
     float_t *a = entry->base.a_ptr_;
     float_t *out = entry->base.out_ptr_;

@@ -13,7 +13,7 @@ This project focuses on implementing a **Domain-Specific Accelerator (DSA)** to 
 ## **Current Progress**
 
 1. **Current Performance**  
-   - Execution time reduced: **21502 ms → 1156 ms** (18.6x speedup).  
+   - Execution time reduced: **21502 ms → 1035 ms** (20.77x speedup).  
 
 2. **MMIO-based Communication**  
    - Uses **Memory-Mapped I/O (MMIO)** for communication between the CPU and the accelerator, enabling efficient hardware-software co-design.  
@@ -23,7 +23,7 @@ This project focuses on implementing a **Domain-Specific Accelerator (DSA)** to 
 
 4. **CNN Optimization**  
    - **Convolutional Layer Optimization**: Improved the speed of inner product calculations and addition in the `convolutional_layer.h` file, specifically for the **conv3d** function.  
-     - 將部分 **conv3D 計算** 移至硬體電路運行，首先將 **image** 和 **weight** 資料傳入硬體，經計算後再將結果傳回，顯著提高運算效率。  
+     - 將整個 **conv3D 計算** 移至硬體電路運行，首先將 **image** 和 **weight** 資料傳入硬體，經計算後再將結果傳回，顯著提高運算效率。  
    - **Fully Connected Layer Optimization**: Enhanced the efficiency of inner product computations in the **fully_connected_layer**.  
    - **Average Pooling Layer Optimization**: Improved the speed of inner product calculations and addition.  
 

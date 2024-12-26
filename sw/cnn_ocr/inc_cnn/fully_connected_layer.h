@@ -76,8 +76,6 @@ fully_connected_layer * get_fully_connected_layer_entry(struct list_node *ptr)
 
 void fully_connected_layer_forward_propagation(struct list_node *ptr, input_struct *input)
 {
-    // clock_t tick,ticks_per_msec = CLOCKS_PER_SEC/1000;
-    // tick = clock();
     fully_connected_layer *entry = get_fully_connected_layer_entry(ptr);
     
     if (input->in_size_ != entry->base.in_size_)
@@ -105,13 +103,17 @@ void fully_connected_layer_forward_propagation(struct list_node *ptr, input_stru
         }
         a[i] = *((float volatile *)0xC4400020);
 
-        if (entry->has_bias_)
-            a[i] += b[i];
+            if (entry->has_bias_){
+            *((float volatile *)0xC4400000) = a[i];
+            *((float volatile *)0xC4400004) = b[i];
+            a[i] = *((float volatile *)0xC4400008);
+            // a[i] += b[i];
+        }
+
     }
     for (uint64_t i = 0; i < total_size; i++)
         out[i] = entry->base.activate(a, i, entry->base.out_size_);
-    // tick  = (clock() - tick)/ticks_per_msec;
-    // fully += tick;
+    
 #ifdef PRINT_LAYER
     printf("[%s] done [%f, %f, ... , %f, %f]\n", entry->base.layer_name_, out[0], out[1], out[entry->base.out_size_-2], out[entry->base.out_size_-1]);
 #endif

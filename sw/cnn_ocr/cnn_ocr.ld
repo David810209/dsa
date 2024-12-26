@@ -69,13 +69,11 @@ ENTRY(crt0)
 
 SECTIONS
 {
-    /* 程式碼段 */
     .text :
     {
         *(.text*)
     } > code_ram
 
-    /* 資料段 */
     .data :
     {
         *(.data)
@@ -83,15 +81,12 @@ SECTIONS
         *(.rodata*)
     } > data_ram
 
-    /* DRAM 堆區 (Heap) */
     .heap : ALIGN(0x10)
     {
         __heap_start = .;
         . += __heap_size;
-        __heap_end = .;
     } > data_ram
 
-    /* DRAM 堆疊區 (Stack) */
     .stack : ALIGN(0x10)
     {
         . += __stack_size;

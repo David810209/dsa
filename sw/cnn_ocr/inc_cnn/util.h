@@ -102,6 +102,3 @@ double no_math_ceil(double x)
     return x;
 }
 
-// clock_t pooling;
-// clock_t conv;
-// clock_t fully;
