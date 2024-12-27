@@ -187,12 +187,15 @@ wire [XLEN-1:0] add_result_data2;
 wire add_result_valid2;
 reg add_data_valid2;
 
-
+reg [15:0] relu_idx;
 integer j;
 reg [15:0] out_idx;
 reg start_to_clean;
 reg clean_done;
 reg [15:0] clean_cnt;
+reg comp_data_valid;
+reg relu_done;
+
 always @(posedge clk_i) begin
     if(rst_i)begin
         total_o_img <= 0;
@@ -203,6 +206,8 @@ always @(posedge clk_i) begin
         start_to_clean <= 0;
         clean_cnt <= 0;
         clean_done <= 0;
+        relu_idx <= 0;
+        relu_done <= 0;
     end
     else if(en_i && we_i && addr_i == 32'hC420_0000) begin
         total_o_img <= data_i;
@@ -234,6 +239,22 @@ always @(posedge clk_i) begin
         o_img[out_idx] <= add_result_data2;
         add_data_valid2 <= 0;
         out_idx <= out_idx + 1;
+    end
+    else if(C == C_RELU && comp_result_valid)begin
+        if(comp_result_data)begin
+            o_img[relu_idx - 1] <= 0;
+        end
+        if(relu_idx == total_o_img)begin
+            relu_idx <= 0;
+            relu_done <= 1;
+        end
+        else begin
+            relu_idx <= relu_idx + 1;
+            relu_done <= 0;
+        end
+    end
+    else if(C == C_IDLE)begin
+        relu_done <= 0;
     end
      if(clean_done)begin
         clean_done <= 0;
@@ -490,7 +511,31 @@ begin
         mul_data_valid <= 0;
     end
 end
+////////////////////////////////////////////
+//for FP comp (relu)
+/////////////////////////////////////////////////
+reg [XLEN-1:0] comp_dataA;
+reg [XLEN-1:0] comp_dataB;
+wire [7:0] comp_result_data;
+wire comp_result_valid;
+reg [XLEN-1:0] comp_result_reg;
 
+always @(posedge clk_i)
+begin
+    if(rst_i)begin
+        comp_dataA <= 0;
+        comp_dataB <= 0;
+        comp_data_valid <= 0;
+    end
+    else if(comp_data_valid == 0) begin
+        comp_dataA <= o_img[relu_idx];
+        comp_dataB <= 0;
+        comp_data_valid <= 1;
+    end
+    else if(comp_data_valid)begin
+        comp_data_valid <= 0;
+    end
+end
 ////////////////////////////////////////////
 //result management
 /////////////////////////////////////////////////
@@ -504,6 +549,7 @@ begin
         data_o <= 0;
         send <= 0;
         output_img_cnt <= 0;
+        comp_result_reg <= 0;
     end
     else if(trigger_calc)begin
         output_img_cnt <= 0;
@@ -534,6 +580,12 @@ begin
             ready_reg <= 1;
             send <= 1;
     end
+    else if(en_i &&  !we_i && (addr_i == 32'hC440_0028 && send == 0))begin
+            data_o <= comp_result_valid ? ( comp_result_data ? 0 : comp_dataA) : 
+                                         ( comp_result_reg ? 0 : comp_dataA);
+            ready_reg <= 1;
+            send <= 1;
+    end
     else if(en_i &&  !we_i && (addr_i == 32'hC440_0020) && send == 0)begin
             result_reg <= 0;
             data_o <= result_reg;
@@ -556,6 +608,10 @@ begin
     end
     if(mul_result_valid)begin
         mul_result_reg <= mul_result_data;
+        send <= 0;
+    end
+    if(comp_result_valid)begin
+        comp_result_reg <= comp_result_data;
         send <= 0;
     end
 end
@@ -623,7 +679,7 @@ begin
 end
 
 reg [2:0] C, C_next;
-localparam C_IDLE = 0,C_CALC=1, C_STORE_RESULT=2;
+localparam C_IDLE = 0,C_CALC=1, C_STORE_RESULT=2, C_RELU = 3;
 
 always @(posedge clk_i)
 begin
@@ -651,10 +707,15 @@ begin
         end
         C_STORE_RESULT:begin
             if(out_channel_idx == out_depth && in_channel_idx == 0 && add_result_valid2)begin
-                C_next = C_IDLE;
+                C_next = C_RELU;
             end
             else if(add_result_valid2)begin
                 C_next = C_CALC;
+            end
+        end
+        C_RELU:begin
+            if(relu_done)begin
+                C_next = C_IDLE;
             end
         end
        
@@ -662,13 +723,13 @@ begin
 end
 
 // assign ready_o = (~start_to_clean) && (ready_reg || ready_w_reg || clean_done);
-assign ready_o = ~start_to_clean;
+assign ready_o = ~start_to_clean && C != C_RELU;
 
 ////////////////////////////////////////////
 //fIP Management
 /////////////////////////////////////////////////
 // FMA IP
-FP_FMA floating_point_0(
+FP_FMA fma(
     .aclk(clk_i),
     .s_axis_a_tvalid(data_valid),
     .s_axis_a_tdata(feeder_dataA),
@@ -683,7 +744,7 @@ FP_FMA floating_point_0(
     .m_axis_result_tdata(fp_result_data)
 );
 
-FP_FMA fma(
+FP_FMA fma2(
     .aclk(clk_i),
     .s_axis_a_tvalid(fma_data_valid),
     .s_axis_a_tdata(fma_dataA),
@@ -732,6 +793,20 @@ FP_MUL fpmul(
 
     .m_axis_result_tvalid(mul_result_valid),
     .m_axis_result_tdata(mul_result_data)
+);
+
+//FP COMPARE IP (LESS THAN)
+floating_point_0 fpcomp(
+    .aclk(clk_i),
+    .s_axis_a_tvalid(comp_data_valid),
+    .s_axis_a_tdata(comp_dataA),
+
+    .s_axis_b_tvalid(comp_data_valid),
+    .s_axis_b_tdata(comp_dataB),
+
+
+    .m_axis_result_tvalid(comp_result_valid),
+    .m_axis_result_tdata(comp_result_data)
 );
 
 endmodule

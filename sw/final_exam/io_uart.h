@@ -1,11 +1,12 @@
-#pragma once
 // =============================================================================
-//  Program : activation_function.h
-//  Author  : Chang-Jyun Liao
-//  Date    : July/14/2024
+//  Program : io_uart.h
+//  Author  : Chun-Jen Tsai
+//  Date    : Nov/04/2019
 // -----------------------------------------------------------------------------
 //  Description:
-//      This file defines the available activation functions for the CNN models.
+//  This is the minimal I/O library for the boot code of aquila. It only
+//  contains the UART I/O and printf() function with '%d', '%x', and '%s'
+//  formating characters alone to keep the boot code as small as possible.
 // -----------------------------------------------------------------------------
 //  Revision information:
 //
@@ -18,10 +19,10 @@
 //  In the following license statements, "software" refers to the
 //  "source code" of the complete hardware/software system.
 //
-//  Copyright 2024,
+//  Copyright 2019,
 //                    Embedded Intelligent Systems Lab (EISL)
 //                    Deparment of Computer Science
-//                    National Yang Ming Chiao Tung University
+//                    National Chiao Tung Uniersity
 //                    Hsinchu, Taiwan.
 //
 //  All rights reserved.
@@ -53,42 +54,12 @@
 //  POSSIBILITY OF SUCH DAMAGE.
 // =============================================================================
 
-#include "util.h"
-#include "config.h"
-#include <stdint.h>
-#include <stdlib.h>
-
-static inline float_t identity(float_t *arr, uint64_t index, uint64_t out_dim)
-{
-    return arr[index];
-}
-
-static inline float_t relu(float_t *arr, uint64_t index, uint64_t out_dim)
-{
-    // *((float volatile *)0xC4400024) = arr[index]; 
-    return max((float_t)0, arr[index]);
-    // return *((float volatile *)0xC4400028); 
-}
-
-static inline float_t bounded_relu(float_t *arr, uint64_t index, uint64_t out_dim)
-{
-    return max((float_t)0, min((float_t)1, arr[index]));
-}
-
-#if USE_MATH_LIB // Comment these functions out to avoid using <math.h>
-#include <math.h>
-
-static inline float_t softmax(float_t *arr, uint64_t index, uint64_t out_dim)
-{
-    float_t max = 0;
-    for (uint64_t i = 0; i < out_dim; i++)
-        if (arr[i] > max)
-            max = arr[i];
-    float_t numer = exp(arr[index] - max);
-    float_t denom = 0;
-    for (uint64_t i = 0; i < out_dim; i++)
-        denom += exp(arr[i] - max);
-    return numer / denom;
-}
-#endif
-
+unsigned char inbyte(void);
+void outbyte(unsigned char);
+int getchar(void);
+int putchar(int c);
+void putd(int);
+void putx(unsigned int, int);
+int puts(char *str);
+int printf(char *fmt, ...);
+void exit(int status);

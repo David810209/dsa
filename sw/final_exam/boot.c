@@ -1,11 +1,10 @@
-#pragma once
 // =============================================================================
-//  Program : activation_function.h
-//  Author  : Chang-Jyun Liao
-//  Date    : July/14/2024
-// -----------------------------------------------------------------------------
-//  Description:
-//      This file defines the available activation functions for the CNN models.
+//  Program : boot.c
+//  Author  : Chun-Jen Tsai
+//  Date    : Jan/14/2020
+// =============================================================================
+//  This is the entry point of the boot code. Must be located at the
+//  beginning of the text section in the linker script.
 // -----------------------------------------------------------------------------
 //  Revision information:
 //
@@ -18,10 +17,10 @@
 //  In the following license statements, "software" refers to the
 //  "source code" of the complete hardware/software system.
 //
-//  Copyright 2024,
+//  Copyright 2019,
 //                    Embedded Intelligent Systems Lab (EISL)
 //                    Deparment of Computer Science
-//                    National Yang Ming Chiao Tung University
+//                    National Chiao Tung Uniersity
 //                    Hsinchu, Taiwan.
 //
 //  All rights reserved.
@@ -52,43 +51,34 @@
 //  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 //  POSSIBILITY OF SUCH DAMAGE.
 // =============================================================================
+#include "io_uart.h"
 
-#include "util.h"
-#include "config.h"
-#include <stdint.h>
-#include <stdlib.h>
+extern int main(void);
 
-static inline float_t identity(float_t *arr, uint64_t index, uint64_t out_dim)
+extern unsigned int __stack_top; /* declared in the linker script */
+unsigned int stack_top = (unsigned int) &__stack_top;
+unsigned int sp_store;
+
+void boot(void)
 {
-    return arr[index];
+    // We must save the return address to the boot loader before
+    // we assign the sp to __stack_top defined in the linker script.
+    asm volatile ("lui t0, %hi(sp_store)");
+    asm volatile ("sw sp, %lo(sp_store)(t0)");
+
+    // Set the stack pointer. The application linker script sets
+    // the top address of the stack area to __stack_top.
+    asm volatile("lui t0, %hi(stack_top)");
+    asm volatile("lw  sp, %lo(stack_top)(t0)");
+
+    // Enter the main program of the boot loader
+    main();
+
+    // Now, we must restore the stack pointer of the boot loader
+    // so that we can execute the epilogue of the boot loader properly.
+    asm volatile ("lui t0, %hi(sp_store)");
+    asm volatile ("lw sp, %lo(sp_store)(t0)");
+
+    // Halt the processor.
+    exit(0);
 }
-
-static inline float_t relu(float_t *arr, uint64_t index, uint64_t out_dim)
-{
-    // *((float volatile *)0xC4400024) = arr[index]; 
-    return max((float_t)0, arr[index]);
-    // return *((float volatile *)0xC4400028); 
-}
-
-static inline float_t bounded_relu(float_t *arr, uint64_t index, uint64_t out_dim)
-{
-    return max((float_t)0, min((float_t)1, arr[index]));
-}
-
-#if USE_MATH_LIB // Comment these functions out to avoid using <math.h>
-#include <math.h>
-
-static inline float_t softmax(float_t *arr, uint64_t index, uint64_t out_dim)
-{
-    float_t max = 0;
-    for (uint64_t i = 0; i < out_dim; i++)
-        if (arr[i] > max)
-            max = arr[i];
-    float_t numer = exp(arr[index] - max);
-    float_t denom = 0;
-    for (uint64_t i = 0; i < out_dim; i++)
-        denom += exp(arr[i] - max);
-    return numer / denom;
-}
-#endif
-
