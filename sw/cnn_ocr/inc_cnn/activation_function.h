@@ -65,7 +65,9 @@ static inline float_t identity(float_t *arr, uint64_t index, uint64_t out_dim)
 
 static inline float_t relu(float_t *arr, uint64_t index, uint64_t out_dim)
 {
+    // *((float volatile *)0xC4400024) = arr[index]; 
     return max((float_t)0, arr[index]);
+    // return *((float volatile *)0xC4400028); 
 }
 
 static inline float_t bounded_relu(float_t *arr, uint64_t index, uint64_t out_dim)

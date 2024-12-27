@@ -112,34 +112,40 @@ void conv_copy_and_pad_input(convolutional_layer *entry, input_struct *input)
 {
     if (entry->pad_type_ == same)
     {
+        
         index3d in_ = entry->in_;
         index3d in_padded_ = entry->in_padded_;
-        index3d padding_ = entry->padding_;
+        // index3d padding_ = entry->padding_;
 
-        uint64_t c = 0;
-        uint64_t y = 0;
+        // uint64_t c = 0;
+        // uint64_t y = 0;
 
         float_t *in = input->in_ptr_;
         float_t *dst = entry->base.padded_ptr;
-        uint64_t total_size = in_.depth_ * in_.height_;
-
-        for (uint64_t i = 0; i < total_size; i++)
+        uint64_t total_size = in_.depth_ * in_.height_ * in_.width_;
+        float_t *pimg = &dst[get_index(&in_padded_, 0, 0, 0)];
+        const float_t *pin = &in[get_index(&in_, 0, 0, 0)];
+        for(uint64_t i = 0; i < total_size; i++)
         {
-            float_t *pimg = &dst[get_index(&in_padded_, padding_.width_, padding_.height_ + y, c)];
-            const float_t *pin = &in[get_index(&in_, 0, y, c)];
-
-            for (uint64_t x = 0; x < in_.width_; x++)
-            {
-                pimg[x] = pin[x];
-            }
-            
-            y++;
-            if (y == in_.height_)
-            {
-                y = 0;
-                c++;
-            }
+            pimg[i] = pin[i];
         }
+        // for (uint64_t i = 0; i < total_size; i++)
+        // {
+        //     float_t *pimg = &dst[get_index(&in_padded_, padding_.width_, padding_.height_ + y, c)];
+        //     const float_t *pin = &in[get_index(&in_, 0, y, c)];
+
+        //     for (uint64_t x = 0; x < in_.width_; x++)
+        //     {
+        //         pimg[x] = pin[x];
+        //     }
+            
+        //     y++;
+        //     if (y == in_.height_)
+        //     {
+        //         y = 0;
+        //         c++;
+        //     }
+        // }
     }
 }
 
@@ -155,15 +161,15 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
     }
     conv_copy_and_pad_input(entry, input);
 
-    float_t *a = entry->base.a_ptr_;
-    float_t *b = entry->base._b;
+    // float_t *a = entry->base.a_ptr_;
+    // float_t *b = entry->base._b;
     float_t *out = entry->base.out_ptr_;
     input->in_ptr_ = out;
     input->in_size_ = entry->base.out_size_;
     index3d out_ = entry->out_;
-    uint64_t total_size = out_.depth_;
-    uint64_t out_dim = out_.height_*out_.width_;
-    uint64_t out_size = out_dim * total_size;
+    // uint64_t total_size = out_.depth_;
+    // uint64_t out_dim = out_.height_*out_.width_;
+    uint64_t out_size = entry->base.out_size_;
     float_t *W = entry->base._W;
     float_t *in = entry->base.padded_ptr;
     index3d in_ = entry->in_;
@@ -194,28 +200,28 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
     }
     *((int volatile *)0xC430000c) = 1; // trigger calculation.
     while(*((int volatile *)0xC430000c) == 0);
-    float_t *pa = &a[get_index(&out_, 0, 0, 0)];
+    // float_t *pa = &a[get_index(&out_, 0, 0, 0)];
     for(int i = 0; i < out_size; i++)
     {
-        pa[i] = *((float volatile *)0xC4200004);
+        out[i] = *((float volatile *)0xC4200004);
     }
-    int ii = 0;
-    if (entry->has_bias_) {
-        for (uint64_t o = 0; o < total_size; o++)
-        {
-            for (uint64_t index = 0; index < out_dim; index++){
-                *((float volatile *)0xC4400000) = pa[ii];
-                *((float volatile *)0xC4400004) = b[o];
-                pa[ii] = *((float volatile *)0xC4400008);
-                ii++;
-                // ppa[index] += b[o];
-            }
-        }
-    }
-    total_size = entry->base.out_size_;
+    // int ii = 0;
+    // if (entry->has_bias_) {
+    //     for (uint64_t o = 0; o < total_size; o++)
+    //     {
+    //         for (uint64_t index = 0; index < out_dim; index++){
+    //             *((float volatile *)0xC4400000) = pa[ii];
+    //             *((float volatile *)0xC4400004) = b[o];
+    //             pa[ii] = *((float volatile *)0xC4400008);
+    //             ii++;
+    //             // ppa[index] += b[o];
+    //         }
+    //     }
+    // }
+    // total_size = entry->base.out_size_;
 
-    for (uint64_t c = 0; c < total_size; c++)
-        out[c] = entry->base.activate(a, c, entry->base.out_size_);
+    // for (uint64_t c = 0; c < total_size; c++)
+    //     out[c] = entry->base.activate(out, c, entry->base.out_size_);
     // if(tcm_in) tcm_free(tcm_in);
     
 
