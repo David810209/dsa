@@ -523,7 +523,7 @@ mig_7series_0 MIG(
 //-------------------------------------------------------------------------
 // data_feeder
 //
-data_feeder Data_Feeder
+cnn_top cnn_top
 (
     // System signals
     .clk_i(clk),

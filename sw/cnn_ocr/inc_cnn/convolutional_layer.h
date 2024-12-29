@@ -175,7 +175,7 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
     index3d in_ = entry->in_;
     index3d weight_ = entry->weight_;
     //trigger reset 0
-    *((int volatile *)0xC4200000) = out_size;
+    *((int volatile *)0xC4300028) = out_size;
     //initialize register
     *((int volatile *)0xC4300000) = in_.width_;
     *((int volatile *)0xC4300004) = out_.width_;
@@ -185,25 +185,25 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
     //load image into register
     float_t * ppi = &in[get_index(&in_, 0, 0, 0)];
     uint64_t input_image_size = in_.width_ * in_.height_ * in_.depth_;
-    *((int volatile *)0xC4100000) = input_image_size;
+    *((int volatile *)0xC4300020) = input_image_size;
     for(int i = 0;i < input_image_size; i++)
     {
-        *((float volatile *)0xC4100004) = *ppi++;
+        *((float volatile *)0xC4300024) = *ppi++;
     }
 
     // load weight into register
     uint64_t weight_size = weight_.width_ * weight_.height_ * weight_.depth_;
     float_t *pw = &W[get_index(&weight_, 0, 0, 0)];
-    *((int volatile *)0xC4000000) = weight_size; // trigger load weight.
+    *((int volatile *)0xC4300018) = weight_size; // trigger load weight.
     for(int i = 0; i < weight_size; i++){
-        *((float volatile *)0xC4000004) = *pw++;
+        *((float volatile *)0xC430001c) = *pw++;
     }
     *((int volatile *)0xC430000c) = 1; // trigger calculation.
     while(*((int volatile *)0xC430000c) == 0);
     // float_t *pa = &a[get_index(&out_, 0, 0, 0)];
     for(int i = 0; i < out_size; i++)
     {
-        out[i] = *((float volatile *)0xC4200004);
+        out[i] = *((float volatile *)0xC430002c);
     }
     // int ii = 0;
     // if (entry->has_bias_) {
