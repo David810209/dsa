@@ -16,7 +16,10 @@ module conv_layer #(
     input [XLEN-1 : 0]      addr_i,
     input [XLEN-1 : 0]      data_i,
     output                  ready_o,
-    output reg [XLEN-1 : 0]     data_o
+    output reg [XLEN-1 : 0] data_o,
+    output   reg               sending_o,
+    output [5:0]            out_width_const,
+    output [5:0]            out_depth_const
 );
 
 /*
@@ -112,7 +115,7 @@ begin
 end
 
 reg [2:0] C, C_next;
-localparam C_IDLE = 0,C_CALC=1, C_STORE_RESULT=2, C_RELU = 3;
+localparam C_IDLE = 0,C_CALC=1, C_STORE_RESULT=2, C_RELU = 3, C_SEND = 4;
 
 always @(posedge clk_i)
 begin
@@ -148,10 +151,14 @@ begin
         end
         C_RELU:begin
             if(relu_done)begin
+                C_next = C_SEND;
+            end
+        end
+       C_SEND:begin
+            if(output_img_cnt == total_o_img)begin
                 C_next = C_IDLE;
             end
         end
-       
     endcase
 end
 
@@ -162,8 +169,8 @@ assign ready_o = ~start_to_clean && C != C_RELU;
 /////////////////////////////////////////////////
 reg [15:0] load_weight_cnt;
 reg [15:0] total_weight;
-reg [15:0] inner_weight_num;
-(* ram_style="block" *) reg [XLEN-1:0] weight_data[4095:0];
+wire [15:0] inner_weight_num = weight_width * weight_width;
+(* ram_style="block" *) reg [XLEN-1:0] weight_data[4096:0];
 reg written;
 
 always @(posedge clk_i) begin
@@ -171,12 +178,9 @@ always @(posedge clk_i) begin
         load_weight_cnt <= 0;
         total_weight <= 0;
         written <= 0;
-
-        inner_weight_num <= 0;
     end
     else if(en_i && we_i && addr_i == 32'hC430_0018) begin
         total_weight <= data_i;
-        inner_weight_num <= weight_width * weight_width;
         load_weight_cnt <= 0;
         written <= 0;
     end
@@ -197,17 +201,22 @@ always @(posedge clk_i) begin
     
 end
 
+always @(posedge clk_i) begin
+    if(rst_i)begin
+        sending_o <= 0;
+    end
+    else if(C == C_SEND)begin
+        if(output_img_cnt == total_o_img)begin
+            sending_o <= 0;
+        end
+        else begin
+            sending_o <= 1;
+        end
+    end
+end
 ////////////////////////////////////////////
 //load image data
 /////////////////////////////////////////////////
-/*
-ppi=0
-for(int i = 0;i<24;i++){
-for(int j = 0;j < 24;j++){ ppi++;}
-ppi += 4;
-}
-ppi = 676;
-*/
 
 reg [15:0] load_i_img_cnt;
 reg [15:0] total_i_img;
@@ -250,7 +259,6 @@ reg [15:0] total_o_img;
 reg [15:0] output_img_cnt;
 
 reg [15:0] relu_idx;
-integer j;
 reg [15:0] out_idx;
 reg start_to_clean;
 reg clean_done;
@@ -314,6 +322,8 @@ always @(posedge clk_i) begin
     end
 end
 
+assign out_width_const = out_width;
+assign out_depth_const = out_depth;
 ////////////////////////////////////////////
 //conv 3d calculation
 /////////////////////////////////////////////////
@@ -341,6 +351,10 @@ always @(posedge clk_i) begin
         out_width <= 0;
         idx_x <= 0;
         idx_y <= 0;
+        weight_width <= 0;
+        in_depth <= 0;
+        in_width <= 0;
+        out_depth <= 0;
     end
     else if(en_i && we_i && addr_i == 32'hC430_0000) begin
         in_width <= data_i;
@@ -495,7 +509,6 @@ reg [XLEN-1:0] comp_dataA;
 reg [XLEN-1:0] comp_dataB;
 wire [7:0] comp_result_data;
 wire comp_result_valid;
-reg [XLEN-1:0] comp_result_reg;
 
 always @(posedge clk_i)
 begin
@@ -517,32 +530,23 @@ end
 ////////////////////////////////////////////
 //result management
 /////////////////////////////////////////////////
-reg send;
 always @(posedge clk_i)
 begin
     if(rst_i)begin
         data_o <= 0;
-        send <= 0;
         output_img_cnt <= 0;
     end
     else if(trigger_calc)begin
         output_img_cnt <= 0;
     end
-    else if(en_i &&  !we_i && (addr_i == 32'hC430_002c && send == 0))begin
+    else if(C == C_SEND)begin
             data_o <= o_img[output_img_cnt];
             if(output_img_cnt == total_o_img)begin
                 output_img_cnt <= 0;
             end
             else begin
             output_img_cnt <= output_img_cnt + 1;
-            send <= 1;
             end
-    end
-    else if(en_i && !we_i && addr_i == 32'hC430_000c)begin
-        data_o <= C == C_IDLE;
-    end
-    else if(send)begin
-        send <= 0;
     end
 end
 
@@ -579,7 +583,7 @@ FP_ADD fp_add2(
 );
 
 //FP COMPARE IP (LESS THAN)
-floating_point_0 fpcomp(
+FP_COMP fpcomp(
     .aclk(clk_i),
     .s_axis_a_tvalid(comp_data_valid),
     .s_axis_a_tdata(comp_dataA),

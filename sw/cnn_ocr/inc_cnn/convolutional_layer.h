@@ -108,46 +108,46 @@ static uint64_t conv_out_dim(uint64_t in_width, uint64_t in_height, uint64_t win
     return conv_out_length(in_width, window_width, w_padding, w_stride, pad_type) * conv_out_length(in_height, window_height, h_padding, h_stride, pad_type);
 }
 
-void conv_copy_and_pad_input(convolutional_layer *entry, input_struct *input)
-{
-    if (entry->pad_type_ == same)
-    {
+// void conv_copy_and_pad_input(convolutional_layer *entry, input_struct *input)
+// {
+//     if (entry->pad_type_ == same)
+//     {
         
-        index3d in_ = entry->in_;
-        index3d in_padded_ = entry->in_padded_;
-        // index3d padding_ = entry->padding_;
+//         index3d in_ = entry->in_;
+//         index3d in_padded_ = entry->in_padded_;
+//         // index3d padding_ = entry->padding_;
 
-        // uint64_t c = 0;
-        // uint64_t y = 0;
+//         // uint64_t c = 0;
+//         // uint64_t y = 0;
 
-        float_t *in = input->in_ptr_;
-        float_t *dst = entry->base.padded_ptr;
-        uint64_t total_size = in_.depth_ * in_.height_ * in_.width_;
-        float_t *pimg = &dst[get_index(&in_padded_, 0, 0, 0)];
-        const float_t *pin = &in[get_index(&in_, 0, 0, 0)];
-        for(uint64_t i = 0; i < total_size; i++)
-        {
-            pimg[i] = pin[i];
-        }
-        // for (uint64_t i = 0; i < total_size; i++)
-        // {
-        //     float_t *pimg = &dst[get_index(&in_padded_, padding_.width_, padding_.height_ + y, c)];
-        //     const float_t *pin = &in[get_index(&in_, 0, y, c)];
+//         float_t *in = input->in_ptr_;
+//         float_t *dst = entry->base.padded_ptr;
+//         uint64_t total_size = in_.depth_ * in_.height_ * in_.width_;
+//         float_t *pimg = &dst[get_index(&in_padded_, 0, 0, 0)];
+//         const float_t *pin = &in[get_index(&in_, 0, 0, 0)];
+//         for(uint64_t i = 0; i < total_size; i++)
+//         {
+//             pimg[i] = pin[i];
+//         }
+//         // for (uint64_t i = 0; i < total_size; i++)
+//         // {
+//         //     float_t *pimg = &dst[get_index(&in_padded_, padding_.width_, padding_.height_ + y, c)];
+//         //     const float_t *pin = &in[get_index(&in_, 0, y, c)];
 
-        //     for (uint64_t x = 0; x < in_.width_; x++)
-        //     {
-        //         pimg[x] = pin[x];
-        //     }
+//         //     for (uint64_t x = 0; x < in_.width_; x++)
+//         //     {
+//         //         pimg[x] = pin[x];
+//         //     }
             
-        //     y++;
-        //     if (y == in_.height_)
-        //     {
-        //         y = 0;
-        //         c++;
-        //     }
-        // }
-    }
-}
+//         //     y++;
+//         //     if (y == in_.height_)
+//         //     {
+//         //         y = 0;
+//         //         c++;
+//         //     }
+//         // }
+//     }
+// }
 
 void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct *input)
 {
@@ -159,19 +159,17 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
         printf("Error input size not match %lu/%lu\n", input->in_size_, entry->base.in_size_);
         exit(-1);
     }
-    conv_copy_and_pad_input(entry, input);
+    // conv_copy_and_pad_input(entry, input);
 
     // float_t *a = entry->base.a_ptr_;
     // float_t *b = entry->base._b;
     float_t *out = entry->base.out_ptr_;
-    input->in_ptr_ = out;
-    input->in_size_ = entry->base.out_size_;
     index3d out_ = entry->out_;
     // uint64_t total_size = out_.depth_;
     // uint64_t out_dim = out_.height_*out_.width_;
     uint64_t out_size = entry->base.out_size_;
     float_t *W = entry->base._W;
-    float_t *in = entry->base.padded_ptr;
+    // float_t *in = entry->base.padded_ptr;
     index3d in_ = entry->in_;
     index3d weight_ = entry->weight_;
     //trigger reset 0
@@ -183,6 +181,7 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
     *((int volatile *)0xC4300010) = in_.depth_;
     *((int volatile *)0xC4300014) = out_.depth_;
     //load image into register
+    float_t *in = input->in_ptr_;
     float_t * ppi = &in[get_index(&in_, 0, 0, 0)];
     uint64_t input_image_size = in_.width_ * in_.height_ * in_.depth_;
     *((int volatile *)0xC4300020) = input_image_size;
@@ -198,13 +197,15 @@ void convolutional_layer_forward_propagation(struct list_node *ptr, input_struct
     for(int i = 0; i < weight_size; i++){
         *((float volatile *)0xC430001c) = *pw++;
     }
-    *((int volatile *)0xC430000c) = 1; // trigger calculation.
-    while(*((int volatile *)0xC430000c) == 0);
+
+        input->in_ptr_ = out;
+    input->in_size_ = entry->base.out_size_;
+    // while(*((int volatile *)0xC430000c) == 0);
     // float_t *pa = &a[get_index(&out_, 0, 0, 0)];
-    for(int i = 0; i < out_size; i++)
-    {
-        out[i] = *((float volatile *)0xC430002c);
-    }
+    // for(int i = 0; i < out_size; i++)
+    // {
+    //     out[i] = *((float volatile *)0xC430002c);
+    // }
     // int ii = 0;
     // if (entry->has_bias_) {
     //     for (uint64_t o = 0; o < total_size; o++)

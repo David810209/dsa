@@ -74,13 +74,15 @@ declare MMIO address
 32'hC440_001c = input data B 
 32'hC440_0020 = output data 
 */
-
+wire pooling_en = (addr_i[31:20] == 12'hC42) && en_i;
 wire conv_top_en = (addr_i[31:20] == 12'hC43) && en_i;
 wire calculator_en = (addr_i[31:20] == 12'hC44)&& en_i; 
-assign ready_o = S == S_CONV ? conv_ready : calculator_ready;
-assign data_o = S == S_CONV ?  conv_data : calculator_data;
+assign ready_o = S == S_CONV ? conv_ready : 
+                S == S_POOLING ? pooling_ready: calculator_ready;
+                
+assign data_o = S == S_POOLING ?  pooling_data : calculator_data;
 reg [2:0] S, S_next;
-localparam S_CONV = 0, S_CALCULATOR = 1;
+localparam S_IDLE = 0, S_CONV = 1, S_SEND = 2, S_POOLING = 3, S_CALCULATOR = 4;
 always @(posedge clk_i)
 begin
     if(rst_i) S <= S_CONV;
@@ -91,8 +93,19 @@ always @(*)
 begin
     S_next = S;
     case(S)
+        S_IDLE: begin
+            if(conv_top_en) S_next = S_CONV;
+            else if(calculator_en) S_next = S_CALCULATOR;
+        end
         S_CONV: begin
-            if(calculator_en) S_next = S_CALCULATOR;
+            if(pooling_en) S_next = S_POOLING;
+            else if(calculator_en) S_next=S_CALCULATOR;
+        end
+        S_POOLING: begin
+            if(conv_top_en) S_next = S_CONV;
+            
+            else if(calculator_en) S_next=S_CALCULATOR;
+            
         end
         S_CALCULATOR: begin
             if(conv_top_en) S_next = S_CONV;
@@ -102,6 +115,9 @@ end
 
 wire conv_ready;
 wire [XLEN-1 : 0] conv_data;
+wire conv_sending;
+wire [5:0]  conv_out_width;
+wire [5:0]  conv_out_depth;
 conv_layer conv_layer
 (
     // System signals
@@ -114,7 +130,30 @@ conv_layer conv_layer
     .addr_i(addr_i),
     .data_i(data_i),
     .ready_o(conv_ready),
-    .data_o(conv_data)
+    .data_o(conv_data),
+    .sending_o(conv_sending),
+    .out_width_const(conv_out_width),
+    .out_depth_const(conv_out_depth)
+);
+
+wire pooling_ready;
+wire [XLEN-1 : 0] pooling_data;
+pooling_layer pooling_layer
+(
+    // System signals
+    .clk_i(clk_i),
+    .rst_i(rst_i),
+
+    // Device bus signals
+    .en_i(pooling_en),
+    .we_i(conv_sending),
+    .addr_i(addr_i),
+    .data_i(conv_data),
+    .ready_o(pooling_ready),
+    .data_o(pooling_data),
+
+    .in_width(conv_out_width),
+    .in_depth(conv_out_depth)
 );
 
 wire calculator_ready;

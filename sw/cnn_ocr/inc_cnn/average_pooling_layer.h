@@ -85,44 +85,49 @@ void average_pooling_layer_forward_propagation(struct list_node *ptr, input_stru
         printf("Error input size not match %lu/%lu\n", input->in_size_, entry->base.in_size_);
         exit(-1);
     }
-    float_t *in = input->in_ptr_;
-    float_t *a = entry->base.a_ptr_;
+    // float_t *in = input->in_ptr_;
+    // float_t *a = entry->base.a_ptr_;
     float_t *out = entry->base.out_ptr_;
     input->in_ptr_ = out;
     input->in_size_ = entry->base.out_size_;
-    uint64_t stride_ = entry->stride_;
+    // uint64_t stride_ = entry->stride_;
 
-    index3d in_ = entry->in_;
-    index3d out_ = entry->out_;
+    // index3d in_ = entry->in_;
+    // index3d out_ = entry->out_;
 
     uint64_t total_size = entry->base.out_size_;
-    
-    uint64_t dim = out_.height_*out_.width_;
-    for (uint64_t o = 0; o < total_size; o++)
+    *((int volatile *)0xC430000c) = 1; // trigger calculation.
+    while(*((int volatile *)0xC4200004) == 0);
+    for(int i = 0;i < total_size; i++)
     {
-        uint64_t c = o / dim;
-        a[o] = (float_t)0;
-        uint64_t xy = o % dim;
-        uint64_t dsty = xy / out_.width_;
-        uint64_t dstx = xy % out_.width_;
-        uint64_t y = dsty*stride_;
-        uint64_t x = dstx*stride_;
-        uint64_t dymax = min(entry->pooling_size_, in_.height_ - y);
-        uint64_t dxmax = min(entry->pooling_size_, in_.width_ - x);
-
-        for (uint64_t dy = 0; dy < dymax; dy++)
-            for (uint64_t dx = 0; dx < dxmax; dx++)
-            {
-                *((float volatile *)0xC4400000) = a[o];
-                *((float volatile *)0xC4400004) =in[get_index(&in_, x + dx, y + dy, c)] ;
-                a[o] = *((float volatile *)0xC4400008);
-                // a[o] += in[get_index(&in_, x + dx, y + dy, c)];
-            }
-        *((float volatile *)0xC440000c) = a[o];
-        *((float volatile *)0xC4400010) = entry->scale_factor_;
-        a[o] = *((float volatile *)0xC4400014);
-        // a[o] *= entry->scale_factor_;
+        out[i] = *((float volatile *)0xC4200000);
     }
+    // uint64_t dim = out_.height_*out_.width_;
+    // for (uint64_t o = 0; o < total_size; o++)
+    // {
+    //     uint64_t c = o / dim;
+    //     a[o] = (float_t)0;
+    //     uint64_t xy = o % dim;
+    //     uint64_t dsty = xy / out_.width_;
+    //     uint64_t dstx = xy % out_.width_;
+    //     uint64_t y = dsty*stride_;
+    //     uint64_t x = dstx*stride_;
+    //     uint64_t dymax = min(entry->pooling_size_, in_.height_ - y);
+    //     uint64_t dxmax = min(entry->pooling_size_, in_.width_ - x);
+
+    //     for (uint64_t dy = 0; dy < dymax; dy++)
+    //         for (uint64_t dx = 0; dx < dxmax; dx++)
+    //         {
+    //             *((float volatile *)0xC4400000) = a[o];
+    //             *((float volatile *)0xC4400004) =in[get_index(&in_, x + dx, y + dy, c)] ;
+    //             a[o] = *((float volatile *)0xC4400008);
+    //             // a[o] += in[get_index(&in_, x + dx, y + dy, c)];
+    //         }
+    //     *((float volatile *)0xC440000c) = a[o];
+    //     *((float volatile *)0xC4400010) = entry->scale_factor_;
+    //     a[o] = *((float volatile *)0xC4400014);
+    //     // a[o] *= entry->scale_factor_;
+    // }
 
     // for (uint64_t o = 0; o < total_size; o++)
     //     out[o] = entry->base.activate(a, o, entry->base.out_size_);
