@@ -62,7 +62,7 @@
     `define WDFP  128             // MIG controller user logic data width
     `define DQSP  2               // MIG DQS parameter
     `define USRP  4               // # of user buttons & LEDs
-    `define SOC_CLK 50_000_000    // system clock rate
+    `define SOC_CLK 50_000_000   // system clock rate
 `else // KC705
     `define CLP   256             // Cache line size
     `define DRAMP 64              // DRAM chip bus width

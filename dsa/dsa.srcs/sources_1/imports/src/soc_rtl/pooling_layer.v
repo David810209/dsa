@@ -87,12 +87,28 @@ wire [5:0] out_width = in_width / 2;
 
 reg [15:0] load_i_img_cnt;
 (* ram_style="block" *) reg [XLEN-1:0] i_img[2047:0];
+wire [XLEN-1:0] i_img_rdata = i_img[i_img_raddr];
+wire [XLEN-1:0] i_img_wdata = data_i;
+wire [15:0] i_img_raddr = inner_cnt == 0 ? img_idx :
+                         inner_cnt == 1 ? img_idx + 1 : 
+                         inner_cnt == 2 ? img_idx + in_width :
+                                         img_idx + in_width + 1;
+wire [15:0] i_img_waddr = load_i_img_cnt;
+wire i_img_ren = S == S_ACCUM_IN;
+wire i_img_wen = we_i;
+
+
+always @(posedge clk_i) begin
+    if(i_img_wen)begin
+        i_img[i_img_waddr] <= i_img_wdata;
+    end
+end
 always @(posedge clk_i) begin
     if(rst_i)begin
         load_i_img_cnt <= 0;
     end
     else if(we_i)begin
-            i_img[load_i_img_cnt] <= data_i;
+            // i_img[load_i_img_cnt] <= data_i;
             load_i_img_cnt <= load_i_img_cnt + 1;
     end
     else  if(load_i_img_cnt == in_size)begin
@@ -160,21 +176,22 @@ begin
         img_idx <= 0;
     end
     else if(S == S_ACCUM_IN)begin
+        accum_dataA <= i_img_rdata;
         if(inner_cnt == 0)begin
-            accum_dataA <= i_img[img_idx];
+            // accum_dataA <= i_img[img_idx];
             accum_data_valid <= 1;
             inner_cnt <= 1;
         end
         else if(inner_cnt == 1)begin
-            accum_dataA <= i_img[img_idx + 1];
+            // accum_dataA <= i_img[img_idx + 1];
             inner_cnt <= 2;
         end
         else if(inner_cnt == 2)begin
-            accum_dataA <= i_img[img_idx + in_width];
+            // accum_dataA <= i_img[img_idx + in_width];
             inner_cnt <= 3;
         end
         else if(inner_cnt == 3)begin
-            accum_dataA <= i_img[img_idx + in_width + 1];
+            // accum_dataA <= i_img[img_idx + in_width + 1];
             accum_tlast <= 1;
             inner_cnt <= 0;
             if(i_idx == out_width - 1)begin
@@ -259,5 +276,32 @@ FP_MUL fpmul(
     .m_axis_result_tvalid(mul_result_valid),
     .m_axis_result_tdata(mul_result_data)
 );
+
+
+//profiler
+(*mark_debug = "true"*) reg [31 :0] load_image;
+(*mark_debug = "true"*) reg [31 :0] send_out_image;
+(*mark_debug = "true"*) reg [31 :0] accum_cnt;
+(*mark_debug = "true"*) reg [31 :0] mul_cnt;
+
+always @(posedge clk_i)
+begin
+    if(rst_i)begin
+        load_image <= 0;
+        send_out_image <= 0;
+    end
+    else if(S == S_SEND_IN)begin
+        load_image <= load_image + 1;
+    end
+    else if(S == S_RESULT)begin
+        send_out_image <= send_out_image + 1;
+    end
+    else if(S == S_ACCUM_IN || S == S_ACCUM)begin
+        accum_cnt <= accum_cnt + 1;
+    end
+    else if(S == S_MUL)begin
+        mul_cnt <= mul_cnt + 1;
+    end
+end
 
 endmodule

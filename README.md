@@ -4,7 +4,7 @@
 This project focuses on implementing a **Domain-Specific Accelerator (DSA)** to accelerate the inner product operations in a **Convolutional Neural Network (CNN)** for handwriting recognition. The design is based on **`aquila`** — a RISC-V 5-stage pipelined core developed by the **Embedded Intelligence System Lab (EISL)**. The primary focus is on optimizing the **convolutional layer**, **Average Pooling Layer**, and **fully connected layer** Floating Point  computations (mainly focus on convolution) to improve CNN performance.  
 
 ## **Current Performance**  
-   - Execution time reduced: **21502 ms → 295 ms** (72.89x speedup).
+   - Execution time reduced: **21502 ms → 298 ms** (72.15x speedup).
 ---
 
 ## **System Architecture**  
@@ -15,7 +15,7 @@ This project focuses on implementing a **Domain-Specific Accelerator (DSA)** to 
 ## **Current Progress**
 
 1. **Current Performance**  
-   - Execution time reduced: **21502 ms → 295 ms** (72.89x speedup).
+   - Execution time reduced: **21502 ms → 298 ms** (72.15x speedup).
 
 2. **CNN Optimization**  
    - **Convolutional Layer +Average Pooling Layer  Optimization**: Transfer the whole process into hardware in the `convolutional_layer.h`, `average_pooling.h` file, including the convolutional operation, ReLU activation, and pooling operation.

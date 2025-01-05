@@ -96,6 +96,7 @@ begin
         S_IDLE:begin
             if(en_i && we_i && addr_i == 32'hC430_0018)begin
                 S_next = S_LOAD_WEIGHT;
+                
             end
             else if(en_i && we_i && addr_i == 32'hC430_0020)begin
                 S_next = S_LOAD_I_IMG;
@@ -170,33 +171,26 @@ assign ready_o = ~start_to_clean && C != C_RELU;
 reg [15:0] load_weight_cnt;
 reg [15:0] total_weight;
 wire [15:0] inner_weight_num = weight_width * weight_width;
-(* ram_style="block" *) reg [XLEN-1:0] weight_data[4096:0];
-reg written;
+(* ram_style="block" *) reg [XLEN-1:0] weight_data[2400:0];
 
 always @(posedge clk_i) begin
     if(rst_i)begin
         load_weight_cnt <= 0;
         total_weight <= 0;
-        written <= 0;
     end
     else if(en_i && we_i && addr_i == 32'hC430_0018) begin
         total_weight <= data_i;
         load_weight_cnt <= 0;
-        written <= 0;
     end
     else if(S == S_LOAD_WEIGHT)begin
         if(load_weight_cnt == total_weight)begin
             load_weight_cnt <= 0;
         end
         else
-        if(we_i && addr_i == 32'hC430_001c && !written)begin
+        if(en_i && we_i && addr_i == 32'hC430_001c)begin
             weight_data[load_weight_cnt] <= data_i;
             load_weight_cnt <= load_weight_cnt + 1;
-            written <= 1;
         end
-        else if(!we_i)begin
-        written <= 0;
-    end
     end
     
 end
@@ -221,32 +215,25 @@ end
 reg [15:0] load_i_img_cnt;
 reg [15:0] total_i_img;
 (* ram_style="block" *) reg [XLEN-1:0] i_img[1023:0];
-reg i_img_written;
 
 always @(posedge clk_i) begin
     if(rst_i)begin
         load_i_img_cnt <= 0;
         total_i_img <= 0;
-        i_img_written <= 0;
     end
     else if(en_i && we_i && addr_i == 32'hC430_0020) begin
         total_i_img <= data_i;
         load_i_img_cnt <= 0;
-        i_img_written <= 0;
     end
     else if(S == S_LOAD_I_IMG)begin
         if(load_i_img_cnt == total_i_img)begin
             load_i_img_cnt <= 0;
         end
         else
-        if(we_i && addr_i == 32'hC430_0024 && !i_img_written)begin
+        if(en_i && we_i && addr_i == 32'hC430_0024)begin
             i_img[load_i_img_cnt] <= data_i;
             load_i_img_cnt <= load_i_img_cnt + 1;
-            i_img_written <= 1;
         end
-        else if(!we_i)begin
-        i_img_written <= 0;
-    end
     end
     
 end
@@ -256,6 +243,40 @@ end
 /////////////////////////////////////////////////
 reg [15:0] total_o_img;
 (* ram_style="block" *)  reg [XLEN-1:0] o_img[2047:0];  // 24*24
+
+reg [XLEN-1:0] o_img_wdata;
+reg [15:0] o_img_waddr;
+reg o_img_wen;
+
+wire [15:0] relu_m1 = relu_idx - 1;
+always @(*) begin
+    if (start_to_clean && clean_cnt != total_o_img) begin
+        o_img_wdata = 0;
+        o_img_waddr = clean_cnt;
+        o_img_wen = 1;
+    end else if (C == C_STORE_RESULT && add_result_valid2) begin
+        o_img_wdata = add_result_data2;
+        o_img_waddr = out_idx;
+        o_img_wen = 1;
+    end else if (C == C_RELU && comp_result_valid && comp_result_data) begin
+        o_img_wdata = 0;
+        o_img_waddr = relu_m1;
+        o_img_wen = 1;
+    end else begin
+        o_img_wdata = 0;
+        o_img_waddr = 0;
+        o_img_wen = 0;
+    end
+end
+
+
+always @(posedge clk_i) begin
+    if(o_img_wen)begin
+        o_img[o_img_waddr] <= o_img_wdata;
+    end
+end
+
+
 reg [15:0] output_img_cnt;
 
 reg [15:0] relu_idx;
@@ -287,7 +308,7 @@ always @(posedge clk_i) begin
             clean_done <= 1;
         end
         else begin 
-            o_img[clean_cnt] <= 0;
+            // o_img[clean_cnt] <= 0;
             clean_cnt <= clean_cnt + 1;
         end
     end
@@ -298,12 +319,12 @@ always @(posedge clk_i) begin
         out_idx <= out_channel_idx * out_width * out_width;
     end
     else if(C == C_STORE_RESULT && add_result_valid2)begin
-        o_img[out_idx] <= add_result_data2;
+        // o_img[out_idx] <= add_result_data2;
         out_idx <= out_idx + 1;
     end
     else if(C == C_RELU && comp_result_valid)begin
         if(comp_result_data)begin
-            o_img[relu_idx - 1] <= 0;
+            // o_img[relu_idx - 1] <= 0;
         end
         if(relu_idx == total_o_img)begin
             relu_idx <= 0;
@@ -496,6 +517,7 @@ begin
     end
     else if(C == C_STORE_RESULT && fma_result_valid)begin
         dataA2 <= o_img[out_idx];
+        // dataA2 <= o_img_rdata;
         dataB2 <= fma_result_data;
         add_data_valid2 <= 1;
     end
@@ -519,6 +541,7 @@ begin
     end
     else if(comp_data_valid == 0) begin
         comp_dataA <= o_img[relu_idx];
+        // comp_dataA <= o_img_rdata;
         comp_dataB <= 0;
         comp_data_valid <= 1;
     end
@@ -541,6 +564,7 @@ begin
     end
     else if(C == C_SEND)begin
             data_o <= o_img[output_img_cnt];
+            // data_o <= o_img_rdata;
             if(output_img_cnt == total_o_img)begin
                 output_img_cnt <= 0;
             end
@@ -596,4 +620,35 @@ FP_COMP fpcomp(
     .m_axis_result_tdata(comp_result_data)
 );
 
+
+//profiler
+(*mark_debug = "true"*) reg [31 :0] load_weight;
+(*mark_debug = "true"*) reg [31 :0] load_i_img;
+(*mark_debug = "true"*) reg [31 :0] send_out_image;
+(*mark_debug = "true"*) reg [31 :0] fma_cnt;
+(*mark_debug = "true"*) reg [31 :0] relu_cnt;
+
+always @(posedge clk_i)
+begin
+    if(rst_i)begin
+        load_weight <= 0;
+        load_i_img <= 0;
+        send_out_image <= 0;
+    end
+    else if(S == S_LOAD_WEIGHT)begin
+        load_weight <= load_weight + 1;
+    end
+    else if(S == S_LOAD_I_IMG)begin
+        load_i_img <= load_i_img + 1;
+    end
+    else if(C == C_SEND)begin
+        send_out_image <= send_out_image + 1;
+    end
+    else if(C == C_CALC || C == C_STORE_RESULT)begin
+        fma_cnt <= fma_cnt + 1;
+    end
+    else if(C == C_RELU)begin
+        relu_cnt <= relu_cnt + 1;
+    end
+end
 endmodule
